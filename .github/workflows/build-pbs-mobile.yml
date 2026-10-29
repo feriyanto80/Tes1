@@ -1,4 +1,4 @@
-name: Build PBS Mobile APK
+name: Build PBS Balap Android APK
 on:
   push:
     branches: [pbs-mobile-android-v1]
@@ -44,7 +44,7 @@ jobs:
       - name: Upload APK file
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_BALAP_v1.0.1_APK
+          name: PBS_Balap_v1.0.2_APK
           path: pbs-mobile/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
