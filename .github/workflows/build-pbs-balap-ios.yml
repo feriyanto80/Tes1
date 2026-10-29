@@ -1,0 +1,64 @@
+name: Build PBS Balap iOS
+on:
+  push:
+    branches: [pbs-balap-ios-v1]
+    paths:
+      - "ios/**"
+      - ".github/workflows/build-pbs-balap-ios.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate official PBS app icons
+        run: |
+          python -m pip install --disable-pip-version-check Pillow
+          python ios/tools/make_icons.py
+      - name: Validate Xcode project
+        run: |
+          xcodebuild -list -project ios/PBSBalap.xcodeproj
+          plutil -lint ios/PBSBalap/Info.plist
+      - name: Compile for iOS Simulator
+        run: |
+          xcodebuild -project ios/PBSBalap.xcodeproj \
+            -scheme PBSBalap -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/pbs-balap-simulator" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Compile native iPhone device app (unsigned)
+        run: |
+          xcodebuild -project ios/PBSBalap.xcodeproj \
+            -scheme PBSBalap -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/pbs-balap-device" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Package output (unsigned, NOT installable on physical iPhone)
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/ipa/Payload" ios-build-out
+          SIM_APP="$RUNNER_TEMP/pbs-balap-simulator/Build/Products/Release-iphonesimulator/PBSBalap.app"
+          DEVICE_APP="$RUNNER_TEMP/pbs-balap-device/Build/Products/Release-iphoneos/PBSBalap.app"
+          test -d "$SIM_APP"
+          test -d "$DEVICE_APP"
+          cp -R "$DEVICE_APP" "$RUNNER_TEMP/ipa/Payload/PBSBalap.app"
+          (cd "$RUNNER_TEMP/ipa" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.0-UNSIGNED.ipa" Payload)
+          (cd "$(dirname "$SIM_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-iOS-Simulator.app.zip" PBSBalap.app)
+          echo 'UNSIGNED IPA: not installable on physical iPhone without Apple signing and provisioning.' > ios-build-out/IMPORTANT-READ-FIRST.txt
+          ls -lh ios-build-out
+      - name: Upload iOS build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: PBS_Balap_iOS_v1.0.0_UNSIGNED_build
+          path: ios-build-out/
+          retention-days: 30
+          if-no-files-found: error
