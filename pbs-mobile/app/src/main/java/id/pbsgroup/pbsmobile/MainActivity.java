@@ -2,6 +2,9 @@ package id.pbsgroup.pbsmobile;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.location.LocationManager;
 import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -41,7 +44,7 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String HOME_URL =
-        "https://script.google.com/macros/s/AKfycbwfQLhAVyjEPjXXTU_pLbAqWXVImers_huvebEgBwUs4EkxObeA8bedcydLLgDDDagJ/exec?utm_source=chatgpt.com";
+        "https://balap.pbsgroup.id/";
     private static final int REQUEST_FILES = 1201;
     private static final int REQUEST_GPS = 1202;
     private static final int REQUEST_STORAGE = 1203;
@@ -96,16 +99,26 @@ public class MainActivity extends Activity {
         labels.setPadding(dp(10),0,0,0);
         header.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
         TextView title = new TextView(this);
-        title.setText("PBS Mobile");
+        title.setText("PBS BALAP");
         title.setTextSize(17);
         title.setTextColor(Color.WHITE);
         title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         labels.addView(title);
         TextView sub = new TextView(this);
-        sub.setText("PT Panca Baswara Sakti");
+        sub.setText("balap.pbsgroup.id");
         sub.setTextSize(10);
         sub.setTextColor(Color.rgb(169,197,218));
         labels.addView(sub);
+
+        TextView gps = new TextView(this);
+        gps.setText("GPS");
+        gps.setContentDescription("Periksa izin dan status GPS Android");
+        gps.setGravity(Gravity.CENTER);
+        gps.setTextSize(13);
+        gps.setTextColor(Color.WHITE);
+        gps.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        gps.setOnClickListener(v -> showGpsDiagnostics());
+        header.addView(gps,new LinearLayout.LayoutParams(dp(46),dp(46)));
 
         TextView reload = new TextView(this);
         reload.setText("\u27f3");
@@ -132,7 +145,7 @@ public class MainActivity extends Activity {
         errorView.setBackgroundColor(Color.WHITE);
         errorView.setPadding(dp(20),dp(20),dp(20),dp(20));
         TextView msg = new TextView(this);
-        msg.setText("Halaman tidak dapat dibuka.\nPeriksa koneksi internet atau akses Apps Script.");
+        msg.setText("Halaman BALAP tidak dapat dibuka.\nPeriksa koneksi internet dan balap.pbsgroup.id.");
         msg.setTextSize(16);
         msg.setTextColor(Color.rgb(37,52,72));
         msg.setGravity(Gravity.CENTER);
@@ -152,14 +165,57 @@ public class MainActivity extends Activity {
         errorView.setVisibility(View.GONE);
     }
 
-    private boolean isTrustedGoogleAppsScript(Uri uri) {
+    private boolean isTrustedAppOrigin(Uri uri) {
         if (uri == null || !"https".equalsIgnoreCase(uri.getScheme())) return false;
         String host = uri.getHost();
         if (host == null) return false;
         host = host.toLowerCase(Locale.US);
-        return host.equals("script.google.com") ||
+        return host.equals("balap.pbsgroup.id") ||
+            host.equals("script.google.com") ||
             host.equals("script.googleusercontent.com") ||
-            host.endsWith(".script.googleusercontent.com");
+            host.endsWith(".script.googleusercontent.com") ||
+            host.endsWith("-script.googleusercontent.com");
+    }
+
+    private boolean hasLocationPermission() {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void showGpsDiagnostics() {
+        if (!hasLocationPermission()) {
+            requestPermissions(new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            }, REQUEST_GPS);
+            return;
+        }
+        LocationManager manager =
+            (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        boolean gpsEnabled = false;
+        boolean networkEnabled = false;
+        try {
+            if (manager != null) {
+                gpsEnabled = manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+                networkEnabled = manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+            }
+        } catch (Exception ignored) { }
+        String message = "Izin lokasi APK: AKTIF\n"
+            + "Penyedia GPS: " + (gpsEnabled ? "AKTIF" : "TIDAK AKTIF") + "\n"
+            + "Lokasi jaringan: " + (networkEnabled ? "AKTIF" : "TIDAK AKTIF")
+            + "\n\nJika lokasi tetap gagal pada form Google Apps Script, "
+            + "periksa pengaturan geolocation iframe dan Permissions-Policy di website.";
+        new AlertDialog.Builder(this)
+            .setTitle("Diagnostik GPS PBS BALAP")
+            .setMessage(message)
+            .setPositiveButton("OK", (dialog, which) -> { })
+            .setNeutralButton("Pengaturan lokasi", (dialog, which) -> {
+                try {startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));}
+                catch (Exception ignored) { }
+            })
+            .show();
     }
 
     private void openExternal(Uri uri) {
@@ -201,7 +257,7 @@ public class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 Uri uri = request.getUrl();
-                if (isTrustedGoogleAppsScript(uri)) return false;
+                if (isTrustedAppOrigin(uri)) return false;
                 openExternal(uri);
                 return true;
             }
@@ -274,14 +330,11 @@ public class MainActivity extends Activity {
             }
             @Override public void onGeolocationPermissionsShowPrompt(String origin,
                 GeolocationPermissions.Callback callback) {
-                if (!isTrustedGoogleAppsScript(Uri.parse(origin))) {
+                if (!isTrustedAppOrigin(Uri.parse(origin))) {
                     callback.invoke(origin,false,false);
                     return;
                 }
-                if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==
-                    PackageManager.PERMISSION_GRANTED ||
-                    checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==
-                    PackageManager.PERMISSION_GRANTED) {
+                if (hasLocationPermission()) {
                     callback.invoke(origin,true,false);
                 } else {
                     locationCallback=callback;
@@ -368,8 +421,11 @@ public class MainActivity extends Activity {
         if(code==REQUEST_GPS) {
             boolean approved=false;
             for(int result:results) if(result==PackageManager.PERMISSION_GRANTED) approved=true;
-            if(locationCallback!=null) locationCallback.invoke(locationOrigin,approved,false);
-            locationCallback=null;locationOrigin=null;
+            boolean fromWeb = locationCallback != null;
+            if (locationCallback != null) locationCallback.invoke(locationOrigin,approved,false);
+            locationCallback=null; locationOrigin=null;
+            if (!fromWeb && approved) showGpsDiagnostics();
+            else if (!fromWeb) Toast.makeText(this,"Izin GPS belum diberikan",Toast.LENGTH_SHORT).show();
         } else if(code==REQUEST_STORAGE) {
             if(results.length>0 && results[0]==PackageManager.PERMISSION_GRANTED &&
                 downloadUrl!=null) startDownload(downloadUrl,downloadDisposition,downloadMime);
