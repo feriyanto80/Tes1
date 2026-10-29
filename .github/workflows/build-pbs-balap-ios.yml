@@ -42,6 +42,19 @@ jobs:
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/pbs-balap-device" \
             CODE_SIGNING_ALLOWED=NO build
+      - name: Regression check - reject unsigned IPA before OTA distribution
+        run: |
+          set -euo pipefail
+          TEST_DIR="$RUNNER_TEMP/unsigned-regression"
+          mkdir -p "$TEST_DIR/Payload"
+          cp -R "$RUNNER_TEMP/pbs-balap-device/Build/Products/Release-iphoneos/PBSBalap.app" "$TEST_DIR/Payload/"
+          (cd "$TEST_DIR" && zip -qr "$RUNNER_TEMP/unsigned-regression.ipa" Payload)
+          if python3 ios/tools/verify_signed_ipa.py "$RUNNER_TEMP/unsigned-regression.ipa"; then
+            echo "::error::SECURITY ERROR: unsigned IPA unexpectedly passed OTA validation"
+            exit 1
+          else
+            echo "PASS: unsigned IPA rejected; only properly signed and provisioned IPA can be uploaded for distribution"
+          fi
       - name: Package build-only output (NOT installable on physical iPhone)
         run: |
           set -eu
