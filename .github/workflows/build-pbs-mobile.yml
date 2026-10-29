@@ -22,8 +22,10 @@ jobs:
       - name: Install Android SDK 35 using runner SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          which sdkmanager
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f || true
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -1)"
+          if [ -z "$SDKMANAGER" ]; then echo "sdkmanager missing"; exit 1; fi
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
