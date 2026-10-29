@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.location.LocationManager;
 import android.app.DownloadManager;
 import android.content.ContentValues;
@@ -49,6 +50,9 @@ public class MainActivity extends Activity {
     private static final int REQUEST_GPS = 1202;
     private static final int REQUEST_STORAGE = 1203;
 
+    private LinearLayout headerBar;
+    private ImageView brandIcon;
+    private TextView brandTitle, brandSubtitle, gpsAction, reloadAction;
     private WebView browser;
     private ProgressBar loading;
     private LinearLayout errorView;
@@ -82,53 +86,54 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Color.WHITE);
         setContentView(root);
 
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(12),dp(5),dp(8),dp(5));
-        header.setBackgroundColor(Color.rgb(13,24,43));
-        root.addView(header,new LinearLayout.LayoutParams(-1,dp(56)));
+        headerBar = new LinearLayout(this);
+        headerBar.setOrientation(LinearLayout.HORIZONTAL);
+        headerBar.setGravity(Gravity.CENTER_VERTICAL);
+        headerBar.setPadding(dp(12),dp(5),dp(8),dp(5));
+        headerBar.setBackgroundColor(Color.rgb(13,24,43));
+        root.addView(headerBar,new LinearLayout.LayoutParams(-1,dp(56)));
 
-        ImageView icon = new ImageView(this);
-        icon.setImageResource(R.drawable.ic_pbs);
-        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        header.addView(icon,new LinearLayout.LayoutParams(dp(40),dp(40)));
+        brandIcon = new ImageView(this);
+        brandIcon.setImageResource(R.drawable.ic_pbs);
+        brandIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        headerBar.addView(brandIcon,new LinearLayout.LayoutParams(dp(40),dp(40)));
 
         LinearLayout labels = new LinearLayout(this);
         labels.setOrientation(LinearLayout.VERTICAL);
         labels.setPadding(dp(10),0,0,0);
-        header.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
-        TextView title = new TextView(this);
-        title.setText("PBS BALAP");
-        title.setTextSize(17);
-        title.setTextColor(Color.WHITE);
-        title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        labels.addView(title);
-        TextView sub = new TextView(this);
-        sub.setText("balap.pbsgroup.id");
-        sub.setTextSize(10);
-        sub.setTextColor(Color.rgb(169,197,218));
-        labels.addView(sub);
+        headerBar.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+        brandTitle = new TextView(this);
+        brandTitle.setText("PBS Balap");
+        brandTitle.setTextSize(17);
+        brandTitle.setTextColor(Color.WHITE);
+        brandTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        labels.addView(brandTitle);
+        brandSubtitle = new TextView(this);
+        brandSubtitle.setText("balap.pbsgroup.id");
+        brandSubtitle.setTextSize(10);
+        brandSubtitle.setTextColor(Color.rgb(169,197,218));
+        labels.addView(brandSubtitle);
 
-        TextView gps = new TextView(this);
-        gps.setText("GPS");
-        gps.setContentDescription("Periksa izin dan status GPS Android");
-        gps.setGravity(Gravity.CENTER);
-        gps.setTextSize(13);
-        gps.setTextColor(Color.WHITE);
-        gps.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        gps.setOnClickListener(v -> showGpsDiagnostics());
-        header.addView(gps,new LinearLayout.LayoutParams(dp(46),dp(46)));
+        gpsAction = new TextView(this);
+        gpsAction.setText("GPS");
+        gpsAction.setContentDescription("Periksa izin dan status GPS Android");
+        gpsAction.setGravity(Gravity.CENTER);
+        gpsAction.setTextSize(13);
+        gpsAction.setTextColor(Color.WHITE);
+        gpsAction.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        gpsAction.setOnClickListener(v -> showGpsDiagnostics());
+        headerBar.addView(gpsAction,new LinearLayout.LayoutParams(dp(46),dp(46)));
 
-        TextView reload = new TextView(this);
-        reload.setText("\u27f3");
-        reload.setContentDescription("Muat ulang");
-        reload.setGravity(Gravity.CENTER);
-        reload.setTextSize(29);
-        reload.setTextColor(Color.WHITE);
-        reload.setOnClickListener(v -> browser.reload());
-        header.addView(reload,new LinearLayout.LayoutParams(dp(48),dp(46)));
+        reloadAction = new TextView(this);
+        reloadAction.setText("\u27f3");
+        reloadAction.setContentDescription("Muat ulang");
+        reloadAction.setGravity(Gravity.CENTER);
+        reloadAction.setTextSize(29);
+        reloadAction.setTextColor(Color.WHITE);
+        reloadAction.setOnClickListener(v -> browser.reload());
+        headerBar.addView(reloadAction,new LinearLayout.LayoutParams(dp(48),dp(46)));
 
+        applyResponsiveHeader();
         loading = new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
         loading.setMax(100);
         loading.setVisibility(View.INVISIBLE);
@@ -163,6 +168,36 @@ public class MainActivity extends Activity {
         errorView.addView(retry);
         frame.addView(errorView,new FrameLayout.LayoutParams(-1,-1));
         errorView.setVisibility(View.GONE);
+    }
+
+    // Adjust the native toolbar for compact phones and landscape, without reloading the form.
+    private void applyResponsiveHeader() {
+        if (headerBar == null) return;
+        Configuration cfg = getResources().getConfiguration();
+        boolean compact = cfg.screenWidthDp < 360;
+        boolean landscape = cfg.orientation == Configuration.ORIENTATION_LANDSCAPE;
+        int height = landscape ? 48 : (compact ? 52 : 58);
+        android.view.ViewGroup.LayoutParams p = headerBar.getLayoutParams();
+        if (p != null) {
+            p.height = dp(height);
+            headerBar.setLayoutParams(p);
+        }
+        headerBar.setPadding(dp(compact ? 7 : 12), dp(3), dp(compact ? 5 : 8), dp(3));
+        brandTitle.setTextSize(compact ? 15 : 17);
+        brandSubtitle.setVisibility(compact || landscape ? View.GONE : View.VISIBLE);
+        int iconSize = compact || landscape ? 34 : 40;
+        brandIcon.getLayoutParams().width = dp(iconSize);
+        brandIcon.getLayoutParams().height = dp(iconSize);
+        brandIcon.requestLayout();
+        gpsAction.getLayoutParams().width = dp(compact ? 38 : 46);
+        reloadAction.getLayoutParams().width = dp(compact ? 40 : 48);
+        gpsAction.requestLayout();
+        reloadAction.requestLayout();
+    }
+
+    @Override public void onConfigurationChanged(Configuration cfg) {
+        super.onConfigurationChanged(cfg);
+        applyResponsiveHeader();
     }
 
     private boolean isTrustedAppOrigin(Uri uri) {
@@ -246,8 +281,12 @@ public class MainActivity extends Activity {
         settings.setSupportMultipleWindows(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setGeolocationEnabled(true);
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setSupportZoom(true);
+        settings.setTextZoom(100);
         settings.setMediaPlaybackRequiresUserGesture(true);
-        settings.setBuiltInZoomControls(false);
+        settings.setBuiltInZoomControls(true);
         settings.setDisplayZoomControls(false);
         if (Build.VERSION.SDK_INT >= 26) settings.setSafeBrowsingEnabled(true);
         CookieManager.getInstance().setAcceptCookie(true);
@@ -267,6 +306,22 @@ public class MainActivity extends Activity {
             }
             @Override public void onPageFinished(WebView view,String url) {
                 loading.setVisibility(View.INVISIBLE);
+                // Only enhance the BALAP top-level page. Never inject into third-party
+                // Google Apps Script frames or override an existing viewport declaration.
+                Uri page = Uri.parse(url);
+                if ("https".equalsIgnoreCase(page.getScheme()) &&
+                    "balap.pbsgroup.id".equalsIgnoreCase(page.getHost())) {
+                    view.evaluateJavascript(
+                        "(function(){if(!document.querySelector('meta[name=viewport]'))" +
+                        "{var m=document.createElement('meta');m.name='viewport';" +
+                        "m.content='width=device-width,initial-scale=1';" +
+                        "document.head.appendChild(m);}" +
+                        "if(!document.getElementById('pbs-mobile-responsive'))" +
+                        "{var s=document.createElement('style');s.id='pbs-mobile-responsive';" +
+                        "s.textContent='img,video,iframe{max-width:100%;}" +
+                        "input,select,textarea{max-width:100%;box-sizing:border-box;}';" +
+                        "document.head.appendChild(s);}})();", null);
+                }
             }
             @Override public void onReceivedError(WebView view,WebResourceRequest request,WebResourceError error) {
                 if (request.isForMainFrame()) {
@@ -307,7 +362,7 @@ public class MainActivity extends Activity {
                                 "PBS_"+new SimpleDateFormat("yyyyMMdd_HHmmss",Locale.US).format(new Date())+".jpg");
                             values.put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg");
                             values.put(MediaStore.Images.Media.RELATIVE_PATH,
-                                Environment.DIRECTORY_PICTURES+"/PBS Mobile");
+                                Environment.DIRECTORY_PICTURES+"/PBS Balap");
                             cameraUri=getContentResolver().insert(
                                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,values);
                             if (cameraUri!=null) {
@@ -378,7 +433,7 @@ public class MainActivity extends Activity {
             String name=URLUtil.guessFileName(url,disposition,mime);
             DownloadManager.Request request=new DownloadManager.Request(Uri.parse(url));
             request.setTitle(name);
-            request.setDescription("PBS Mobile download");
+            request.setDescription("PBS Balap download");
             if(mime!=null&&!mime.isEmpty()) request.setMimeType(mime);
             request.setNotificationVisibility(
                 DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
