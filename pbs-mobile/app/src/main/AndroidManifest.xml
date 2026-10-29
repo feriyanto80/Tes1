@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
     <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
-    <application android:label="PBS Mobile" android:allowBackup="false"
+    <application android:label="PBS BALAP" android:allowBackup="false"
         android:usesCleartextTraffic="false"
         android:icon="@drawable/ic_pbs" android:roundIcon="@drawable/ic_pbs"
         android:theme="@style/Theme.PBSMobile">
