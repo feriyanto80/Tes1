@@ -1,22 +1,31 @@
-# PBS BALAP Android v1.0.1
+# PBS Balap Android v1.0.2
 
-Aplikasi Android WebView untuk https://balap.pbsgroup.id/ .
-Tidak membuka endpoint Google Apps Script lama sebagai laman utama.
+Application: **PBS Balap**
+Package: `id.pbsgroup.pbsbalap`
+Home URL: https://balap.pbsgroup.id/
 
-## Perbaikan
-- Memperbaiki whitelist origin geolocation: `balap.pbsgroup.id`, `script.google.com`, dan origin dinamis Google Apps Script `*-script.googleusercontent.com`.
-- Mempertahankan dukungan upload foto, kamera, dan file.
-- Memiliki tombol GPS di header untuk memeriksa izin lokasi Android serta status provider GPS/jaringan.
-- Menjaga pembatasan HTTPS dan penolakan error sertifikat SSL.
+This cumulative version retains the existing WebView, Google Apps Script location permission checks,
+upload, camera, and download support. The icon is derived from the genuine PBS logo supplied by
+the user in this conversation (without the small footer text, which is illegible on launchers).
+The source asset is `pbs-mobile/assets/pbs-official-logo.webp.b64`; build-time script
+generates PNG icons.
 
-## Batasan teknis
-Jika website menyematkan Google Apps Script lintas origin tanpa `allow="geolocation"` atau header Permissions-Policy yang sesuai, akses lokasi tetap dapat gagal dari browser maupun APK. APK tidak dapat melewati kebijakan iframe dari website.
+## Responsive changes
+- Landscape and compact-screen native toolbar that keeps the current WebView alive while rotating.
+- Responsive WebView viewport / overview scaling and pinch zoom.
+- Small, non-destructive CSS additions on `balap.pbsgroup.id` only; cannot restyle cross-origin
+  Google Apps Script iframes or repair website-owned fixed-width HTML automatically.
 
-## Build
-Branch: `pbs-mobile-android-v1`.
-GitHub Actions: `Build PBS Mobile APK`.
-Artifact: `PBS_BALAP_v1.0.1_APK`.
-Android 8 atau lebih baru.
+## GPS boundaries
+Android native GPS permissions are requested only for trusted BALAP / Google Apps Script origins.
+Web pages inside Google Apps Script iframes can still fail to access GPS if the parent site does
+not delegate the geolocation feature via Permissions-Policy / iframe allow attribute. Fix the
+site's iframe settings if the same error recurs.
 
-## Instalasi
-Build debug GitHub Actions memakai keystore sementara setiap run; apabila `APK v1.0.0` sudah terpasang, tanda tangan build baru mungkin tidak cocok. Jika muncul `App not installed`, uninstall versi lama terlebih dahulu lalu instal v1.0.1. Akun atau data yang disimpan dalam WebView lama dapat terhapus oleh uninstall.
+## Installation
+Built through GitHub Actions, download artifact `PBS_Balap_v1.0.2_APK`.
+The package name changed from `id.pbsgroup.pbsmobile` to `id.pbsgroup.pbsbalap`, so
+PBS Balap can be installed alongside the old PBS Mobile build. Old PBS Mobile can be
+uninstalled separately after verifying the new app.
+
+This GitHub Actions artifact is an internal **debug** APK; signing may vary across builds.
