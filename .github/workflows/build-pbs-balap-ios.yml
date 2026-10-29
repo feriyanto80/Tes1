@@ -42,23 +42,23 @@ jobs:
             -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/pbs-balap-device" \
             CODE_SIGNING_ALLOWED=NO build
-      - name: Package output (unsigned, NOT installable on physical iPhone)
+      - name: Package build-only output (NOT installable on physical iPhone)
         run: |
           set -eu
-          mkdir -p "$RUNNER_TEMP/ipa/Payload" ios-build-out
+          mkdir -p ios-build-out
           SIM_APP="$RUNNER_TEMP/pbs-balap-simulator/Build/Products/Release-iphonesimulator/PBSBalap.app"
           DEVICE_APP="$RUNNER_TEMP/pbs-balap-device/Build/Products/Release-iphoneos/PBSBalap.app"
           test -d "$SIM_APP"
           test -d "$DEVICE_APP"
-          cp -R "$DEVICE_APP" "$RUNNER_TEMP/ipa/Payload/PBSBalap.app"
-          (cd "$RUNNER_TEMP/ipa" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.0-UNSIGNED.ipa" Payload)
-          (cd "$(dirname "$SIM_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-iOS-Simulator.app.zip" PBSBalap.app)
-          echo 'UNSIGNED IPA: not installable on physical iPhone without Apple signing and provisioning.' > ios-build-out/IMPORTANT-READ-FIRST.txt
+          # Intentionally do NOT publish an unsigned .ipa, which would fail through BetaDrop.
+          (cd "$(dirname "$DEVICE_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.1-UNSIGNED-Device-App-NOT-INSTALLABLE.zip" PBSBalap.app)
+          (cd "$(dirname "$SIM_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.1-iOS-Simulator.app.zip" PBSBalap.app)
+          printf '%s\n' 'These are build diagnostics only. Do NOT upload to BetaDrop.' 'For an installable signed IPA, use the Sign and Verify PBS Balap IPA (BetaDrop) workflow with valid Apple Developer signing credentials and registered iPhone UDIDs.' > ios-build-out/IMPORTANT-READ-FIRST.txt
           ls -lh ios-build-out
       - name: Upload iOS build outputs
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_Balap_iOS_v1.0.0_UNSIGNED_build
+          name: PBS_Balap_iOS_v1.0.1_BUILD_ONLY_NO_IPA
           path: ios-build-out/
           retention-days: 30
           if-no-files-found: error
