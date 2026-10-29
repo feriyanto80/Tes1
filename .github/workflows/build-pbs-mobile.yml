@@ -19,18 +19,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install SDK 35
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android SDK 35 using runner SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          which sdkmanager
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Generate PBS launcher icon
         run: |
-          python3 -m pip install --user Pillow
-          python3 pbs-mobile/tools/generate_icon.py
+          python -m pip install Pillow
+          python pbs-mobile/tools/generate_icon.py
       - name: Build installable Android APK
         working-directory: pbs-mobile
         run: gradle :app:assembleDebug --no-daemon --stacktrace
