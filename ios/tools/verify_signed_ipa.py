@@ -49,11 +49,10 @@ def verify(ipa: pathlib.Path, expected_team: str = "") -> dict:
             executable = info.get("CFBundleExecutable", "")
             if not executable or prefix + executable not in members:
                 fail("Missing main executable")
-            z.extractall(root)
+        # Ditto preserves executable permissions, symlinks, and macOS attributes.
+        run("/usr/bin/ditto", "-xk", str(ipa), str(root))
         app = root / "Payload" / apps[0]
-        run("/usr/bin/codesign", "--verify", "--strict", "--verbose=2", str(app))
-        signature_info = run("/usr/bin/codesign", "-d", "--entitlements", ":-", str(app))
-        # codesign emits non-sensitive entitlements to stdout or stderr depending on macOS version.
+        run("/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app))
         profile_bytes = run("/usr/bin/security", "cms", "-D", "-i", str(app / "embedded.mobileprovision"))
         profile = plistlib.loads(profile_bytes)
         team_ids = profile.get("TeamIdentifier") or []
