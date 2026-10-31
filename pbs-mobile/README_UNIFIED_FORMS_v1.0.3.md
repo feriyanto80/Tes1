@@ -47,3 +47,7 @@ Native APK permissions cannot bypass cross-origin browser restrictions.
 ## Scope
 'Riwayat' and 'Profil' mockup items were deliberately NOT included because no
 backend/API requirements were supplied. Bottom navigation has only working tabs.
+
+
+## No-conflict distribution 1.0.4
+This branch ships a separate Android application package `id.pbsgroup.pbsbalap.forms` with display name `PBS Balap`. This can coexist with the original `id.pbsgroup.pbsbalap`, without uninstalling it, but DOES NOT in-place update or transfer local WebView data or sessions from the old app. The original v1.0.2 and v1.0.3 had different ephemeral GitHub-run debug signing keys. Android requires the private key used to sign the previously installed app to update that app in place. For all future updates, create and securely retain one signing key as GitHub Actions Secrets; auto-generated per-run debug keys are not suitable for continued distribution.
