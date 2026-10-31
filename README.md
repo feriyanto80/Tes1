@@ -1,20 +1,23 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# IPTV Player v1.0.0
+Aplikasi Android native Kotlin + Jetpack Compose + Media3 ExoPlayer.
 
-# Run and deploy your AI Studio app
+## Fitur
+- Multi-playlist M3U URL, impor file M3U, login Xtream Codes.
+- Live TV, kategori, pencarian, favorit, film & series berdasarkan kategori.
+- Streaming HTTP(S) dengan ExoPlayer, fullscreen landscape, retry.
+- EPG XMLTV (pengguna memasukkan URL EPG), halaman Pengaturan.
+- Penyimpanan playlist dan cache channel secara lokal.
 
-This contains everything you need to run your app locally.
+## Build APK GitHub Actions
+Branch: `iptv-player-v1-build`.
+Buka GitHub > Actions > Build IPTV Player APK > workflow terbaru > Artifacts > IPTV-Player-v1.0.0-APK.
+Ekstrak ZIP artifact untuk mendapat `app-debug.apk`.
 
-View your app in AI Studio: https://ai.studio/apps/86782604-6ea3-4f6d-8bfa-de6e4aee3205
+## Untuk update tanpa uninstall
+APK debug dari GitHub-hosted runner tidak memiliki signing key permanen antarrun.
+Untuk distribusi berkelanjutan, buat release keystore dan simpan key secara aman di GitHub Secrets, lalu build release dengan signing yang sama dan naikkan versionCode.
+Jangan pernah unggah private keystore ke repository publik.
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Catatan
+APK adalah pemutar; tidak mencakup channel atau layanan IPTV. Pengguna harus menggunakan playlist legal/berizin.
+Aplikasi mendukung HTTP(S); server Xtream yang menolak HLS kemungkinan memerlukan format stream lain. Kredensial saat ini tersimpan di SharedPreferences lokal (untuk versi produksi sebaiknya migrasi ke penyimpanan terenkripsi). EPG diproses sampai 2000 program pertama.

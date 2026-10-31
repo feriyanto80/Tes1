@@ -1,0 +1,5 @@
+<resources><style name="Theme.IPTV" parent="android:style/Theme.Material.NoActionBar">
+    <item name="android:statusBarColor">#090F1B</item>
+    <item name="android:navigationBarColor">#151F30</item>
+    <item name="android:windowLightStatusBar">false</item>
+</style></resources>
