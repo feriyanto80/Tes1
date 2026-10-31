@@ -3,11 +3,11 @@ android {
     namespace 'id.pbsgroup.pbsmobile'
     compileSdk 35
     defaultConfig {
-        applicationId 'id.pbsgroup.pbsbalap'
+        applicationId 'id.pbsgroup.pbsbalap.forms'
         minSdk 26
         targetSdk 34
-        versionCode 4
-        versionName '1.0.3'
+        versionCode 5
+        versionName '1.0.4'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
