@@ -1,7 +1,7 @@
-name: Build PBS Balap Android APK
+name: Build PBS Balap Unified APK
 on:
   push:
-    branches: [pbs-mobile-android-v1]
+    branches: [pbs-balap-unified-android-v1]
     paths:
       - 'pbs-mobile/**'
       - '.github/workflows/build-pbs-mobile.yml'
@@ -41,10 +41,18 @@ jobs:
       - name: Build installable Android APK
         working-directory: pbs-mobile
         run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - name: Confirm consolidated app version and manifest
+        run: |
+          set -eu
+          grep -q "versionCode 4" pbs-mobile/app/build.gradle
+          grep -q "versionName '1.0.3'" pbs-mobile/app/build.gradle
+          grep -q "basl.pbsgroup.id" pbs-mobile/app/src/main/java/id/pbsgroup/pbsmobile/MainActivity.java
+          grep -q "balap.pbsgroup.id" pbs-mobile/app/src/main/java/id/pbsgroup/pbsmobile/MainActivity.java
+          test -s pbs-mobile/app/build/outputs/apk/debug/app-debug.apk
       - name: Upload APK file
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_Balap_v1.0.2_APK
+          name: PBS_Balap_v1.0.3_BALAP_BASL_APK
           path: pbs-mobile/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
