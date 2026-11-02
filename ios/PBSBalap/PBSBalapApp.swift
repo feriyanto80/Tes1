@@ -94,7 +94,7 @@ final class LocationStatus: NSObject, ObservableObject, CLLocationManagerDelegat
         UIApplication.shared.open(link)
     }
 
-    var description: String {
+    var diagnosticText: String {
         let permission: String
         switch authorization {
         case .authorizedAlways, .authorizedWhenInUse: permission = "Diizinkan"
@@ -241,7 +241,7 @@ struct UnifiedFormsScreen: View {
                 Button("Minta izin") { location.askPermission() }
                 Button("Pengaturan") { location.openSettings() }
                 Button("Tutup", role: .cancel) {}
-            } message: { Text(location.description) }
+            } message: { Text(location.diagnosticText) }
             .alert("Koneksi BALAP tanpa HTTPS", isPresented: $showingHttpWarning) {
                 Button("Batal", role: .cancel) {}
                 Button("Lanjutkan HTTP") { balap.openLegacyBALAP() }
