@@ -1,7 +1,7 @@
-name: Build PBS Balap iOS
+name: Build PBS Balap iOS v1.0.4 (BALAP+BASL)
 on:
   push:
-    branches: [pbs-balap-ios-v1]
+    branches: [pbs-balap-ios-unified-v1.0.4]
     paths:
       - "ios/**"
       - ".github/workflows/build-pbs-balap-ios.yml"
@@ -28,6 +28,13 @@ jobs:
         run: |
           xcodebuild -list -project ios/PBSBalap.xcodeproj
           plutil -lint ios/PBSBalap/Info.plist
+      - name: Verify both modules and app version
+        run: |
+          set -euo pipefail
+          grep -q "https://balap.pbsgroup.id/" ios/PBSBalap/PBSBalapApp.swift
+          grep -q "https://basl.pbsgroup.id/" ios/PBSBalap/PBSBalapApp.swift
+          grep -q "MARKETING_VERSION = 1.0.4;" ios/PBSBalap.xcodeproj/project.pbxproj
+          grep -q "CURRENT_PROJECT_VERSION = 4;" ios/PBSBalap.xcodeproj/project.pbxproj
       - name: Compile for iOS Simulator
         run: |
           xcodebuild -project ios/PBSBalap.xcodeproj \
@@ -64,14 +71,14 @@ jobs:
           test -d "$SIM_APP"
           test -d "$DEVICE_APP"
           # Intentionally do NOT publish an unsigned .ipa, which would fail through BetaDrop.
-          (cd "$(dirname "$DEVICE_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.1-UNSIGNED-Device-App-NOT-INSTALLABLE.zip" PBSBalap.app)
-          (cd "$(dirname "$SIM_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.1-iOS-Simulator.app.zip" PBSBalap.app)
-          printf '%s\n' 'These are build diagnostics only. Do NOT upload to BetaDrop.' 'For an installable signed IPA, use the Sign and Verify PBS Balap IPA (BetaDrop) workflow with valid Apple Developer signing credentials and registered iPhone UDIDs.' > ios-build-out/IMPORTANT-READ-FIRST.txt
+          (cd "$(dirname "$DEVICE_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.4-UNSIGNED-Device-App-NOT-INSTALLABLE.zip" PBSBalap.app)
+          (cd "$(dirname "$SIM_APP")" && zip -qr "$GITHUB_WORKSPACE/ios-build-out/PBS-Balap-v1.0.4-iOS-Simulator.app.zip" PBSBalap.app)
+          printf '%s\n' 'This artifact is unsigned and is NOT installable on an iPhone. Do NOT upload to BetaDrop.' 'For an installable signed IPA, use the Sign and Verify PBS Balap IPA (BetaDrop) workflow with valid Apple Developer signing credentials and registered iPhone UDIDs.' > ios-build-out/IMPORTANT-READ-FIRST.txt
           ls -lh ios-build-out
       - name: Upload iOS build outputs
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_Balap_iOS_v1.0.1_BUILD_ONLY_NO_IPA
+          name: PBS_Balap_iOS_v1.0.4_BUILD_ONLY_NO_IPA
           path: ios-build-out/
           retention-days: 30
           if-no-files-found: error
