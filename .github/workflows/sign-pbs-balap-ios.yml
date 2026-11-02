@@ -1,10 +1,10 @@
-name: Sign and Verify PBS Balap IPA (BetaDrop)
+name: Sign PBS Balap iOS v1.0.4 IPA (BetaDrop)
 on:
   workflow_dispatch:
   push:
-    branches: [pbs-balap-ios-v1]
+    branches: [pbs-balap-ios-unified-v1.0.4]
     paths:
-      - "ios/signing/trigger.txt"
+      - "ios/signing/trigger-v1.0.4.txt"
 permissions:
   contents: read
 jobs:
@@ -124,11 +124,13 @@ jobs:
           IPA_FILE="$(find "$RUNNER_TEMP/export" -maxdepth 1 -type f -name '*.ipa' | head -1)"
           python3 ios/tools/verify_signed_ipa.py "$IPA_FILE" \
             --team "$IOS_TEAM_ID" --report ios-signed-output/VERIFICATION.json
-          cp "$IPA_FILE" ios-signed-output/PBS-Balap-v1.0.1-SIGNED-AdHoc.ipa
+          # The distribution run must contain exactly the requested PBS Balap v1.0.4.
+          python3 -c 'import json; r=json.load(open("ios-signed-output/VERIFICATION.json")); assert r.get("version") == "1.0.4", r'
+          cp "$IPA_FILE" ios-signed-output/PBS-Balap-v1.0.4-SIGNED-AdHoc.ipa
       - name: Upload ONLY verified signed IPA for BetaDrop
         uses: actions/upload-artifact@v4
         with:
-          name: PBS_Balap_v1.0.1_BetaDrop_SIGNED_IPA
+          name: PBS_Balap_v1.0.4_BALAP_BASL_SIGNED_IPA
           path: ios-signed-output/
           retention-days: 30
           if-no-files-found: error
