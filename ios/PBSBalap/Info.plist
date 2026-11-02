@@ -25,4 +25,10 @@
 <string>PBS Balap membaca foto yang pengguna pilih untuk bukti lapangan.</string>
 <key>NSMicrophoneUsageDescription</key>
 <string>PBS Balap menggunakan mikrofon apabila pengguna merekam bukti video.</string>
+<key>NSAppTransportSecurity</key><dict>
+<key>NSExceptionDomains</key><dict>
+<key>balap.pbsgroup.id</key><dict>
+<key>NSExceptionAllowsInsecureHTTPLoads</key><true/>
+<key>NSIncludesSubdomains</key><false/>
+</dict></dict></dict>
 </dict></plist>
