@@ -1,0 +1,64 @@
+name: PBS Balap iOS v1.0.4 - Free Apple ID Xcode Package
+on:
+  push:
+    branches: [pbs-balap-ios-free-personal-team-v1.0.4]
+    paths:
+      - "ios/**"
+      - ".github/workflows/pbs-balap-ios-free-personal-team.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-and-package:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python for official PBS logo
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate PBS logo into iOS Xcode asset catalog
+        run: |
+          python -m pip install --disable-pip-version-check Pillow
+          python ios/tools/make_icons.py
+      - name: Validate iOS version and both digital form modules
+        run: |
+          set -euo pipefail
+          grep -q 'MARKETING_VERSION = 1.0.4;' ios/PBSBalap.xcodeproj/project.pbxproj
+          grep -q 'https://balap.pbsgroup.id/' ios/PBSBalap/PBSBalapApp.swift
+          grep -q 'https://basl.pbsgroup.id/' ios/PBSBalap/PBSBalapApp.swift
+          test -s ios/PBSBalap/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
+          test -s ios/PBSBalap/Assets.xcassets/BrandLogo.imageset/brand.png
+          plutil -lint ios/PBSBalap/Info.plist
+          xcodebuild -list -project ios/PBSBalap.xcodeproj
+      - name: Compile for iOS Simulator without Apple credentials
+        run: |
+          xcodebuild -project ios/PBSBalap.xcodeproj \
+            -scheme PBSBalap -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/PBSBalap-verify" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Package Xcode project for free Personal Team signing on owner's Mac
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          test -d "$RUNNER_TEMP/PBSBalap-verify/Build/Products/Release-iphonesimulator/PBSBalap.app"
+          zip -qr output/PBS-Balap-iOS-v1.0.4-Free-Apple-ID-Xcode.zip \
+            ios/PBSBalap ios/PBSBalap.xcodeproj ios/README_FREE_APPLE_ID.md
+          cp ios/README_FREE_APPLE_ID.md output/CARA_INSTALL_GRATIS_DI_MAC.md
+          cat > output/READ_FIRST.txt <<'EOF'
+          PBS Balap iOS 1.0.4 - BUILD VALIDATED BY GITHUB.
+          This is an Xcode SOURCE PROJECT, not a signed .ipa.
+          A free Apple ID creates development signing in Xcode on your own Mac.
+          NOT valid for BetaDrop, TestFlight or remote OTA installation.
+          Follow CARA_INSTALL_GRATIS_DI_MAC.md.
+          EOF
+          ls -lh output
+      - name: Publish Xcode project package (NOT an IPA)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PBS_Balap_iOS_v1.0.4_XCODE_FREE_PERSONAL_TEAM
+          path: output/
+          retention-days: 30
+          if-no-files-found: error
