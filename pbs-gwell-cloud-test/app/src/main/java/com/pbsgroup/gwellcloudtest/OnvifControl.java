@@ -79,6 +79,36 @@ final class OnvifControl {
         }catch(Exception ignored){}
         return "";
     }
+    static final class StreamInfo {
+        final int port;
+        final String path;
+        StreamInfo(int port,String path){this.port=port;this.path=path;}
+    }
+    /** Ask ONVIF for actual RTSP URI; never reuse untrusted returned host. */
+    StreamInfo discoverRtsp() throws Exception {
+        String request="<trt:GetStreamUri><trt:StreamSetup>"+
+            "<tt:Stream>RTP-Unicast</tt:Stream>"+
+            "<tt:Transport><tt:Protocol>RTSP</tt:Protocol></tt:Transport>"+
+            "</trt:StreamSetup><trt:ProfileToken>"+escape(token)+
+            "</trt:ProfileToken></trt:GetStreamUri>";
+        String response=post(mediaPath,request);
+        Document document=parse(response);
+        if(document.getElementsByTagNameNS("*","Fault").getLength()>0)
+            throw new Exception("ONVIF GetStreamUri dikembalikan sebagai SOAP Fault.");
+        NodeList uriNodes=document.getElementsByTagNameNS("*","Uri");
+        for(int i=0;i<uriNodes.getLength();i++){
+            String value=uriNodes.item(i).getTextContent().trim();
+            if(value.startsWith("rtsp://")){
+                java.net.URI uri=new java.net.URI(value);
+                String path=uri.getRawPath();
+                if(path==null || path.isEmpty())path="/";
+                if(uri.getRawQuery()!=null)path+="?"+uri.getRawQuery();
+                return new StreamInfo(uri.getPort()>0?uri.getPort():554,path);
+            }
+        }
+        throw new Exception("ONVIF GetStreamUri tidak berisi URL RTSP. Firmware mungkin tidak mendukung layanan Media.");
+    }
+
     String move(float x,float y)throws Exception{
         String payload="<tptz:ContinuousMove><tptz:ProfileToken>"+escape(token)+
             "</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x=\""+x+
