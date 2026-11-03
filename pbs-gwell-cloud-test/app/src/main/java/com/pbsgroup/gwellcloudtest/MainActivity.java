@@ -139,7 +139,7 @@ public final class MainActivity extends Activity {
         String id=appId.getText().toString(),t=appToken.getText().toString(),
             account=email.getText().toString().trim(),pw=password.getText().toString(),
             area=mobileArea.getText().toString().trim();
-        if(id.isBlank()||t.isBlank()||account.isBlank()||pw.isBlank()){
+        if(id.trim().isEmpty()||t.trim().isEmpty()||account.isEmpty()||pw.isEmpty()){
             setStatus("Masukkan AppID/AppToken sah, akun dan password. Tidak ada kredensial bawaan.");
             return;
         }
