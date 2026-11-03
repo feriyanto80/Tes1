@@ -1,31 +1,28 @@
-# PBS Gwell Native P2P v1.2.0 — experimental APK
+# PBS Gwell Native P2P v1.2.1 — diagnostic cumulative build
 
-Cumulative Android release based on **PBS Gwell Live PTZ v1.1.1**. Adds **genuine native IoTVideo SDK LivePlayer**, connected to Device IDs returned by the user's already-working Gwell Cloud account session. **Not RTSP or ONVIF**.
+Full Android APK release based on v1.2.0. Package remains `com.pbsgroup.gwellcloudtest.p2pnative`, versionCode 6, versionName 1.2.1, so it updates v1.2.0 in place (debug signing identity unchanged in this workflow).
 
-## Implementation
-- Existing cloud login and 8-device inventory retained.
-- New **Native Live P2P** button per device (plus original RTSP/ONVIF Live + PTZ).
-- Native AAR from GWTimes/IoTVideo-Android, archived public upstream binary (`app/libs/iotvideo-release.aar`), downloaded in GitHub Actions. This is proprietary third-party code with no confirmed redistribution/commercial license. Do not deploy commercially without agreement from the rights holder.
-- Native `IoTVideoSdk.init(context,null)` then `IoTVideoSdk.register(accessId,accessToken)`, then `LivePlayer.setDataResource(deviceId,...)` and `play()`.
-- Cloud session passed only through in-memory app process; no password or token extras in Android intents; no persistent credentials.
-- SDK callbacks show explicit statuses: `SDK_INIT`, `REGISTER_CALLED`, `P2P_CONNECTING`, `P2P_STATE_PLAY`, `P2P_ERROR <code>`. A successful `register()` call alone is **NOT** proof of backend registration.
-- The existing local RTSP/ONVIF module remains separate and unchanged.
+## v1.2.1 changes
+- Initialize IoTVideo SDK once from `PbsGwellApplication`, before player screen.
+- Select the SDK demo's RELEASE server environment.
+- Enable SDK internal debug logging in app-private files directory `files/iotvideo-sdk-logs`.
+- Decode SDK player states by comparing the official SDK constants: INITIALIZED, PREPARING, READY, LOADING, PLAY, PAUSE, STOP, IDLE.
+- Add 25-second watchdog and player metrics: SDK state, isPlaying, video dimensions and AV bytes/sec.
+- Safe diagnostic report contains event timeline, init status, callback error code and player metrics; it excludes password, AppToken, accessToken and raw SDK logs.
+- Existing Gwell Cloud login/device inventory and RTSP/ONVIF alternative retained.
 
-## Crucial compatibility disclaimer
-`openapi-iot.cloudlinks.cn` cloud login (as used in YooseeExploit client) and 2020 GWTimes/Tencent IoTVideo SDK login may issue incompatible tokens or belong to different IoTVideo product namespaces. We have **not** verified that the 8 cameras' IDs are accessible via this native SDK. A negative callback can indicate incompatible access credential, product scope, cloud namespace or firmware, not that P2P is impossible.
+## Authentication compatibility still needs confirmation
+The public GWTimes IoTVideo demo obtains its `accessId/accessToken` through its own IoTVideo AccountMgr login flow and initializes its product/server environment. This app currently supplies the session from the existing Cloudlinks/Yoosee OpenAPI login. Matching field names and token length do **not** prove the token belongs to the same IoTVideo account/product namespace. The SDK `register()` method returns no success result in this integration, so `REGISTER_CALL_RETURNED` is not proof of backend authentication. If the 25-second watchdog fires or an SDK error appears, obtain the correct IoTVideo/Gwell partner SDK credentials and product configuration from the vendor; do not try arbitrary tokens or credentials.
 
-**PTZ over the native P2P channel is NOT implemented**: GWTimes/IoTVideo Android demo's `directionCtl()` is empty. The existing ONVIF PTZ remains available via local IP only. Do not confuse UI controls with actual P2P PTZ.
+The SDK log is stored privately on the device and may contain sensitive vendor details. The app deliberately does not export raw SDK logs. Share only the on-screen diagnostic report copied by the button.
 
-## Test procedure
-1. Install `PBS_Gwell_Native_P2P_v1.2.0.apk` on Android; package `com.pbsgroup.gwellcloudtest.p2pnative` can coexist with prior debug APKs.
-2. Enable cellular internet, **disable WiFi**, to ensure this tests remote cloud P2P.
-3. Login to your *own* Yoosee/Gwell account using developer credentials that you are authorized to use.
-4. Click *Ambil daftar perangkat akun ini* and pick one of your device IDs.
-5. Click *Uji Live P2P native*. The app will try to register SDK and start native LivePlayer.
-6. If status changes to **P2P_STATE_PLAY** and a real camera image appears, the P2P pathway works. Otherwise copy the diagnostic report, not your login password or vendor tokens.
-7. Do not mistake success on inventory API for streaming success. Do not repeatedly brute-force tokens or accounts.
+## Test
+1. Install the v1.2.1 APK over v1.2.0; keep the existing app installed.
+2. Login to the same account and select an owned Device ID.
+3. Disable Wi-Fi and use mobile data to test remote P2P.
+4. Open Native Live P2P, press Start and wait at least 25 seconds.
+5. Press `Salin Hasil Uji (Tanpa Token)` and paste the report into ChatGPT.
+6. A real stream requires both SDK `STATE_PLAY` and visible camera frames. `register()` returning without throwing is not enough.
 
-## Deployment notes
-- Build artifact (debug signed) placed in GitHub repository `pbs-gwell-cloud-test/releases`, avoiding ChatGPT Library links.
-- This source builds against a publicly archived SDK. SDK binary distribution and continued service access are subject to upstream rights and policy; obtain an official license and compatible SDK for production.
-- If platform/vendor does not accept the current tokens, proper SDK credentials, device binding, product ID/namespace and SDK version must come from Gwell/Yoosee. We cannot bypass authentication.
+## SDK licensing
+The upstream IoTVideo AAR is an archived third-party SDK. This experimental APK is for controlled compatibility testing only. Obtain written redistribution/commercial-use permission and the correct supported SDK package from the rights holder before production deployment.
