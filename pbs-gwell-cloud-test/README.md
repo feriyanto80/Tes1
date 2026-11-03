@@ -1,41 +1,35 @@
-# PBS Gwell Live + PTZ v1.1.0
+# PBS Gwell Live + PTZ v1.1.1
 
-Pengembangan kumulatif dari **PBS Gwell Cloud Device List v1.0.1**. Aplikasi ini menampilkan inventaris kamera milik akun Yoosee yang berhasil login ke Gwell Cloud, serta menyediakan **live RTSP dan kontrol ONVIF PTZ** untuk kamera yang IP-nya dapat dijangkau dari HP.
+Perbaikan kumulatif dari **PBS Gwell Live + PTZ v1.1.0** (termasuk seluruh fitur inventaris Gwell Cloud v1.0.1).
 
-## Fitur
+## Mengapa v1.1.0 menampilkan layar hitam?
+Tombol Live pada v1.1.0 merupakan pemutar **RTSP berbasis IP**, sementara daftar perangkat Gwell Cloud hanya memberikan **Device ID**, bukan IP lokal atau sesi streaming. Pada layar sebelumnya, input IP kamera kosong. Kesalahan `IllegalArgumentException: IP/hostname tidak valid` terjadi **sebelum aplikasi mencoba koneksi RTSP**, bukan karena password atau Device ID salah.
 
-- Login satu akun Yoosee/Gwell Cloud (API cloud **tidak resmi** pada `openapi-iot.cloudlinks.cn`) memakai kredensial AppID/AppToken terotorisasi.
-- Daftar Device ID, salin ID, cek metadata kamera.
-- Tombol **Live + PTZ** pada tiap kamera mengisi Device ID ke layar player.
-- Player Android Media3 RTSP/RTP TCP (H.264 tergantung firmware/codec).
-- ONVIF `GetProfiles`, profile token otomatis jika tersedia, `ContinuousMove`, `Stop`; kontrol arah 8 arah, tekan-tahan dan lepas untuk stop; 3 kecepatan.
-- Tampilan video dengan kontrol playback dan mode layar penuh.
-- Pesan error terpisah untuk RTSP dan ONVIF. Kontrol berhenti saat berpindah halaman.
-- Tidak menyimpan password, P2P session atau RTSP URL ke persistent storage.
-- Tidak memerlukan root; APK debug Android 8+.
-- UI dan nama aplikasi PBS sendiri; **tidak mengkloning merek/logo atau kode proprietary Yoosee**.
+## Penambahan v1.1.1
+- **Cari kamera ONVIF di WiFi ONT ini**: WS-Discovery multicast ke `239.255.255.250:3702` melalui WiFi aktif. Membutuhkan WiFi yang sama dengan kamera, multicast dapat diblokir oleh AP isolation.
+- Tampilkan kandidat IP/port hasil respons ONVIF; pengguna memilih perangkat yang sesuai. Tidak menganggap kandidat ONVIF otomatis identik dengan Device ID Gwell.
+- **Ambil alamat RTSP otomatis dari ONVIF**: GetProfiles + GetStreamUri; mengisi RTSP Port dan Path dari kamera jika firmware mendukung. Host RTSP tetap IP kamera yang telah dipilih, bukan host pihak ketiga dari XML.
+- Pesan kesalahan berbeda saat IP kosong: perangkat Gwell ditemukan di Cloud tetapi belum ada rute IP untuk live RTSP.
+- Tombol **Buka Yoosee untuk Live P2P** sebagai cara menonton video jarak jauh menggunakan aplikasi resmi bila tersedia.
+- Live RTSP TCP, ONVIF PTZ 8 arah, profile token, tombol Stop, fullscreen, daftar Device ID dan pemeriksaan cloud tetap dipertahankan.
+- Tidak meminta password ke server PBS dan tidak menyimpan password lokal secara permanen.
 
-## Batasan penting
+## Sangat penting
+**Versi ini bukan penyambungan P2P Gwell ke aplikasi PBS.** Kode SDK lama `GwellDemo` menggunakan sesi dan verifikasi P2P khusus, sedangkan `GWTimes/IoTVideo-Android` memerlukan integrasi SDK `IoTVideoSdk.register(accessId,accessToken)` dari backend produk terkait. Keduanya **belum terbukti dapat menerima begitu saja** token yang diperoleh dari API `openapi-iot.cloudlinks.cn` pada `YooseeExploit/Client/yoosee.py`. Jangan menganggap delapan Device ID sebagai URL stream P2P.
 
-**Cloud Device ID != RTSP URL.** Gwell Cloud login/listDevice hanya menyediakan inventaris dan metadata, **tidak menyediakan frame video**. Aplikasi ini **BELUM** memiliki SDK P2P Gwell yang berlisensi/berfungsi; karena itu 8 kamera yang berasal dari ONT berbeda **tidak otomatis bisa dilihat lewat seluler**.
+**Untuk video lintas ONT tanpa konfigurasi jaringan** perlu: SDK P2P Gwell yang diotorisasi dengan AppID/AppToken/package khusus, atau jaringan privat CCTV/VPN dari OLT/core operator.
 
-Untuk live dan PTZ, HP harus bisa merutekan IP lokal kamera melalui **WiFi ONT yang sama**, VPN site-to-site/subnet route, atau VLAN CCTV privat yang dirutekan dengan baik. Tanpa konektivitas tersebut, tombol video akan gagal dengan pesan error, bukan fallback otomatis ke P2P.
+## Uji lapangan
+1. Instal APK v1.1.1 di HP. App ID Android terpisah dari v1.1.0 karena APK debug dari GitHub Actions menggunakan sertifikat yang dapat berubah.
+2. Hubungkan HP ke SSID WiFi ONT tempat satu kamera fisik berada.
+3. Login dan ambil daftar Device ID.
+4. Tekan **Live + PTZ** pada kamera yang ingin diuji.
+5. Ketuk **Cari kamera ONVIF di WiFi ONT ini**. Bila berhasil, pilih kandidat IP. Bila tidak ditemukan, kamera mungkin tidak mengaktifkan ONVIF, atau multicast diblokir; lihat IP di DHCP ONT.
+6. Masukkan **username/password kamera**, yang mungkin berbeda dari akun Yoosee Cloud.
+7. Ketuk **Ambil alamat RTSP otomatis dari ONVIF** bila tersedia, lalu **Live RTSP**.
+8. Ketuk **Deteksi profil ONVIF + token PTZ**, tekan-tahan arah dan lepaskan untuk stop.
+9. Jika akses melalui internet seluler tanpa VPN, hasil kosong adalah normal; gunakan aplikasi resmi Yoosee untuk sementara.
 
-Tidak semua firmware Yoosee mendukung RTSP/ONVIF/PTZ. Contoh RTSP path `/onvif1` hanya berlaku di beberapa model; port ONVIF sering 5000 atau 80. Aplikasi tidak mencoba menebak password, mengeksploitasi perangkat atau mem-bypass autentikasi.
-
-Bagi pengguna yang membutuhkan streaming **P2P Cloud per Device ID dari internet tanpa VPN**, pengembangan lanjutan memerlukan SDK Android Gwell/Yoosee yang kompatibel dengan firmware dan AppID/AppToken serta package name khusus yang disetujui vendor.
-
-## Pengujian
-1. Install APK dari `releases/PBS_Gwell_Live_PTZ_v1.1.0.apk`.
-2. Login cloud lalu Ambil daftar perangkat; pastikan ID milik sendiri muncul.
-3. Ketuk **Live + PTZ** pada salah satu kamera.
-4. Masukkan IP kamera yang **dapat dijangkau HP**, port RTSP (default 554), RTSP path, ONVIF port (default 5000), username dan password kamera (bisa berbeda dari akun Yoosee).
-5. Tekan Live RTSP. Jika video muncul, jalur video lokal berhasil.
-6. Tekan Deteksi profil ONVIF, lalu tahan tombol arah. Lepaskan untuk stop.
-7. Coba akses dari seluler tanpa VPN; kegagalan akses IP lokal adalah hasil yang wajar.
-8. Catat error yang muncul untuk penyesuaian path/port/codec dan kemampuan firmware.
-
-## Paket & signing
-Package `com.pbsgroup.gwellcloudtest.liveptz` berbeda dari v1.0.1 agar bisa dipasang berdampingan. Untuk update APK dalam jalur produksi sebaiknya signing key tetap dan applicationId sama.
-
-GitHub branch: `pbs-gwell-live-ptz-v1.1.0`. Alur GitHub Actions mempublikasikan file APK ke folder `pbs-gwell-cloud-test/releases`, tidak melalui file Library ChatGPT.
+## Paket
+Repository: `feriyanto80/Tes1`, branch `pbs-gwell-live-ptz-v1.1.1`.
+Download APK langsung setelah build di `pbs-gwell-cloud-test/releases/PBS_Gwell_Live_PTZ_v1.1.1.apk`.
