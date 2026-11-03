@@ -33,6 +33,12 @@ final class YooseeApi {
     }
 
     boolean hasSession() { return accessTokenFull != null && accessId != null; }
+    void restoreSession(String id,String token) {
+        if(id==null||id.trim().isEmpty()||token==null||token.length()<128)
+            throw new IllegalArgumentException("Sesi Cloudlinks tidak valid.");
+        this.accessId=id;
+        this.accessTokenFull=token;
+    }
     String sessionId() { return accessId; }
     String sessionToken() { return accessTokenFull; }
     void close() { accessTokenFull = null; accessId = null; }
