@@ -6,8 +6,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <queries><package android:name="com.yoosee" /></queries>
     <application android:name=".PbsGwellApplication" android:allowBackup="false" android:usesCleartextTraffic="true"
-        android:label="PBS Gwell P2P Diagnostic 1.2.1"
+        android:label="PBS Gwell P2P Diagnostic 1.2.2"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".CloudAccessActivity" android:exported="false" />
         <activity android:name=".NativeP2PActivity" android:exported="false" />
         <activity android:name=".CameraViewerActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
