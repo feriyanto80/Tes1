@@ -1,6 +1,11 @@
 package com.pbsgroup.gwellcloudtest;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+import java.util.List;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -30,6 +35,7 @@ public final class CameraViewerActivity extends Activity {
     private final int bg=Color.rgb(9,16,29),panel=Color.rgb(24,36,55),accent=Color.rgb(36,197,164);
     private final int white=Color.WHITE,secondary=Color.rgb(175,188,203);
     private final ExecutorService ptzJobs=Executors.newSingleThreadExecutor();
+    private final ExecutorService discoveryJobs=Executors.newSingleThreadExecutor();
     private EditText hostInput,usernameInput,passwordInput,rtspPortInput,rtspPathInput,onvifPortInput;
     private TextView status;
     private PlayerView screen;
@@ -82,7 +88,7 @@ public final class CameraViewerActivity extends Activity {
         screen=new PlayerView(this);screen.setUseController(true);screen.setBackgroundColor(Color.BLACK);
         LinearLayout.LayoutParams pv=new LinearLayout.LayoutParams(-1,dp(235));pv.topMargin=dp(10);
         page.addView(screen,pv);
-        status=text("Belum terhubung. Masukkan IP kamera yang dapat diakses lewat WiFi yang sama atau VPN.",12,secondary,false);
+        status=text("Device ID "+cameraId+" sudah terdaftar di cloud, tetapi server P2P video Gwell belum terhubung. Untuk RTSP gunakan IP kamera pada WiFi ONT yang sama atau VPN.",12,secondary,false);
         status.setTextIsSelectable(true);page.addView(status);
         LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);
         page.addView(actions);
@@ -98,6 +104,9 @@ public final class CameraViewerActivity extends Activity {
         configuration=new LinearLayout(this);configuration.setOrientation(LinearLayout.VERTICAL);
         configuration.setPadding(dp(2),dp(10),dp(2),dp(2));page.addView(configuration);
         configuration.addView(text("KONEKSI KAMERA · ONT/LAN/VPN",13,accent,true));
+        configuration.addView(text("Mode ini bukan P2P Cloud. Kamera yang berbeda ONT tanpa VPN tidak bisa ditemukan melalui multicast lokal.",12,secondary,false));
+        addBtn(configuration,"🔎 Cari kamera ONVIF di WiFi ONT ini",true,v->discoverCameras());
+        addBtn(configuration,"Buka Yoosee untuk Live P2P",false,v->openOfficialYoosee());
         hostInput=field(configuration,"IP/hostname kamera (LAN atau VPN)",extra("host",""),false);
         rtspPortInput=field(configuration,"RTSP Port",extra("rtsp_port","554"),false);
         rtspPathInput=field(configuration,"RTSP Path (bergantung firmware)",extra("rtsp_path","/onvif1"),false);
@@ -147,8 +156,47 @@ public final class CameraViewerActivity extends Activity {
         }
         controls.addView(text("Mode P2P Cloud tidak tersedia di APK ini. Device ID dari Gwell tidak dapat langsung digunakan sebagai URL video. Untuk kamera pada ONT berbeda, aktifkan jalur privat/VPN atau SDK P2P yang disetujui vendor.",12,secondary,false));
     }
+    private void discoverCameras(){
+        status("Mencari ONVIF melalui multicast pada WiFi aktif (hingga 4 detik). Pastikan WiFi ini adalah ONT kamera.");
+        discoveryJobs.execute(()->{
+            try{
+                final List<OnvifDiscovery.Camera> found=OnvifDiscovery.find(getApplicationContext());
+                runOnUiThread(()->{
+                    if(found.isEmpty()){
+                        status("ONVIF discovery: 0 kamera. Pastikan HP pada WiFi ONT yang sama; AP isolation/non-ONVIF dapat memblokir deteksi. Tidak ada penemuan P2P melalui Device ID.");
+                        return;
+                    }
+                    String[] values=new String[found.size()];
+                    for(int i=0;i<found.size();i++)values[i]=found.get(i).label();
+                    new AlertDialog.Builder(this)
+                        .setTitle("Kamera ONVIF ditemukan: "+found.size())
+                        .setMessage("Pilih IP kamera yang benar. Device ID cloud tidak otomatis mencocokkan kamera lokal.")
+                        .setItems(values,(d,which)->{
+                            OnvifDiscovery.Camera c=found.get(which);
+                            hostInput.setText(c.address);
+                            onvifPortInput.setText(String.valueOf(c.port));
+                            ptz=null;
+                            status("IP ditemukan dari WiFi: "+c.address+
+                                ". Isi password kamera, tekan Live RTSP atau Deteksi profil ONVIF. Kamera belum dipetakan otomatis ke Device ID "+cameraId+".");
+                        })
+                        .setNegativeButton("Batal",null)
+                        .show();
+                });
+            }catch(Exception e){status("ONVIF discovery gagal: "+e.getMessage());}
+        });
+    }
+    private void openOfficialYoosee(){
+        Intent launch=getPackageManager().getLaunchIntentForPackage("com.yoosee");
+        if(launch!=null){startActivity(launch);return;}
+        try{
+            startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id=com.yoosee")));
+        }catch(Exception e){
+            startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id=com.yoosee")));
+        }
+    }
     private String hostname(){
         String h=hostInput.getText().toString().trim();
+        if(h.isEmpty())throw new IllegalArgumentException("IP belum diketahui. Klik 'Cari kamera ONVIF di WiFi ONT ini'. Device ID cloud bukan alamat IP RTSP.");
         if(!h.matches("[A-Za-z0-9.\\-]{1,200}"))throw new IllegalArgumentException("IP / hostname tidak valid");
         return h;
     }
@@ -243,6 +291,6 @@ public final class CameraViewerActivity extends Activity {
         catch(Exception ignored){}
     }
     @Override protected void onDestroy(){
-        super.onDestroy();ptzJobs.shutdownNow();
+        super.onDestroy();ptzJobs.shutdownNow();discoveryJobs.shutdownNow();
     }
 }
