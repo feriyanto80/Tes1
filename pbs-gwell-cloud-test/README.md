@@ -1,28 +1,33 @@
-# PBS Gwell Native P2P v1.2.1 — diagnostic cumulative build
+# PBS Native P2P v1.2.2 — cumulative Cloud Access Readiness build
 
-Full Android APK release based on v1.2.0. Package is `com.pbsgroup.gwellcloudtest.p2pnative121`, versionCode 1, versionName 1.2.1. It installs side-by-side with v1.2.0, avoiding Android signature conflict because GitHub-hosted runners generate a fresh debug signing key for each build.
+Cumulative update based on the v1.2.1 diagnostic build. Package: `com.pbsgroup.gwellcloudtest.p2pnative122`; versionCode: 1; versionName: `1.2.2`. This package installs side-by-side with v1.2.1, so neither earlier diagnostic app needs to be uninstalled.
 
-## v1.2.1 changes
-- Initialize IoTVideo SDK once from `PbsGwellApplication`, before player screen.
-- Select the SDK demo's RELEASE server environment.
-- Enable SDK internal debug logging in app-private files directory `files/iotvideo-sdk-logs`.
-- Decode SDK player states by comparing the official SDK constants: INITIALIZED, PREPARING, READY, LOADING, PLAY, PAUSE, STOP, IDLE.
-- Add 25-second watchdog and player metrics: SDK state, isPlaying, video dimensions and AV bytes/sec.
-- Safe diagnostic report contains event timeline, init status, callback error code and player metrics; it excludes password, AppToken, accessToken and raw SDK logs.
-- Existing Gwell Cloud login/device inventory and RTSP/ONVIF alternative retained.
+## Included
+- Retains existing Yoosee account login and Device List flow.
+- Retains Native IoTVideo P2P test screen and its diagnostic callbacks.
+- Adds a Cloud Recording / AI Event readiness screen.
+- Adds a copyable vendor access request for Gwell.
+- Clearly reports that Cloud VAS is not enabled until Gwell confirms the AppID's VAS entitlement, product/package binding, and supported third-party authentication/signature method.
+- No Frida, no borrowed hard-coded credentials, no token extraction from another application, and no fabricated playback URL.
 
-## Authentication compatibility still needs confirmation
-The public GWTimes IoTVideo demo obtains its `accessId/accessToken` through its own IoTVideo AccountMgr login flow and initializes its product/server environment. This app currently supplies the session from the existing Cloudlinks/Yoosee OpenAPI login. Matching field names and token length do **not** prove the token belongs to the same IoTVideo account/product namespace. The SDK `register()` method returns no success result in this integration, so `REGISTER_CALL_RETURNED` is not proof of backend authentication. If the 25-second watchdog fires or an SDK error appears, obtain the correct IoTVideo/Gwell partner SDK credentials and product configuration from the vendor; do not try arbitrary tokens or credentials.
+## Important scope limitation
+This build does **not** claim Cloud AI Event, Cloud Playback, HLS, or MP4 download is operational. The user currently has only AppID and AppToken. The public `camera-hack` scripts use a hard-coded sample Access ID/token and a Frida signing oracle attached to another running application. Those sample credentials are not PBS credentials and must not be reused. The official GWTimes demo's VAS integration also initializes its AccountMgr/product environment separately. AppID/AppToken alone do not establish that PBS has the required VAS entitlement or an officially supported signing interface.
 
-The SDK log is stored privately on the device and may contain sensitive vendor details. The app deliberately does not export raw SDK logs. Share only the on-screen diagnostic report copied by the button.
+Once Gwell confirms access and supplies the supported integration specification, the VAS implementation can be added in a later cumulative release without changing the existing Native P2P path.
 
-## Test
-1. Keep v1.2.0 installed. Install v1.2.1 as a separate diagnostic app; no uninstall is required.
-2. Login to the same account and select an owned Device ID.
-3. Disable Wi-Fi and use mobile data to test remote P2P.
-4. Open Native Live P2P, press Start and wait at least 25 seconds.
-5. Press `Salin Hasil Uji (Tanpa Token)` and paste the report into ChatGPT.
-6. A real stream requires both SDK `STATE_PLAY` and visible camera frames. `register()` returning without throwing is not enough.
+## Build
+GitHub Actions workflow: `.github/workflows/pbs-gwell-cloud-recording-v1.2.2.yml`.
+The workflow downloads the upstream `iotvideo-release.aar`, builds the debug APK, publishes it under `releases/`, and generates a SHA-256 checksum.
+
+## Install and test
+1. Keep v1.2.1 installed.
+2. Install `PBS_Gwell_Native_P2P_v1.2.2.apk` as a separate app.
+3. Log in with the user's own account and authorized AppID/AppToken.
+4. Confirm Device List still loads.
+5. Run Native P2P Live and capture the on-screen safe diagnostic report.
+6. Open `Cloud Recording / AI Event` to see the exact VAS access status and copy the vendor request.
+
+A successful SDK initialization or a void `register()` return is not proof of successful P2P authentication. A real stream requires the SDK PLAY state and visible video frames.
 
 ## SDK licensing
-The upstream IoTVideo AAR is an archived third-party SDK. This experimental APK is for controlled compatibility testing only. Obtain written redistribution/commercial-use permission and the correct supported SDK package from the rights holder before production deployment.
+The upstream IoTVideo AAR is a third-party SDK. This is an experimental compatibility build. Obtain written redistribution/commercial-use permission and the current supported SDK package from the rights holder before production deployment.
