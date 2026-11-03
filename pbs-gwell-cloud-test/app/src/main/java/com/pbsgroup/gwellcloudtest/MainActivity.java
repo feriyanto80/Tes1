@@ -14,6 +14,9 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONObject;
@@ -25,6 +28,8 @@ public final class MainActivity extends Activity {
         secondary=Color.rgb(169,184,200), accent=Color.rgb(36,197,164);
     private EditText email,password,appId,appToken,mobileArea,deviceId;
     private TextView status;
+    private LinearLayout devicesView;
+    private final ArrayList<String> deviceIds = new ArrayList<>();
     private YooseeApi api;
     private long lastAttempt=0;
     private String lastReport="Belum ada pengujian.";
@@ -50,6 +55,11 @@ public final class MainActivity extends Activity {
         mobileArea=input(root,"Kode negara jika menggunakan nomor HP","+62",false);
         Button login=button(root,"Login sekali ke cloud",true);
         Button list=button(root,"Ambil daftar perangkat akun ini",false);
+        devicesView=new LinearLayout(this);
+        devicesView.setOrientation(LinearLayout.VERTICAL);
+        root.addView(devicesView);
+        Button copyIds=button(root,"Salin semua Device ID",false);
+        copyIds.setOnClickListener(v->copyAllIds());
         deviceId=input(root,"Device ID untuk melihat metadata (opsional)","",false);
         Button detail=button(root,"Lihat informasi Device ID",false);
         Button logout=button(root,"Hapus sesi di memori",false);
@@ -70,6 +80,7 @@ public final class MainActivity extends Activity {
             JSONArray arr=data==null?null:data.optJSONArray("deviceList");
             if(arr==null)arr=r.optJSONArray("data");
             int count=arr==null?0:arr.length();
+            if(code==0){final JSONArray devices=arr;runOnUiThread(()->showDevices(devices));}
             return "HTTP "+r.optInt("_httpStatus")+" · code "+code+
                 (code==0?" · perangkat dalam respons: "+count:
                 " · server menolak permintaan / format berubah.")+
@@ -86,9 +97,63 @@ public final class MainActivity extends Activity {
         }));
         logout.setOnClickListener(v->{
             if(api!=null)api.close();api=null;
+            devicesView.removeAllViews();deviceIds.clear();
             setStatus("Sesi ditutup dari memori aplikasi.");
         });
         share.setOnClickListener(v->share());
+    }
+
+    private String firstField(JSONObject item,String... fieldNames){
+        for(String field:fieldNames){
+            String value=item.optString(field,"").trim();
+            if(!value.isEmpty() && !value.equalsIgnoreCase("null"))return value;
+        }
+        return "";
+    }
+    private void showDevices(JSONArray devices){
+        devicesView.removeAllViews();deviceIds.clear();
+        if(devices==null || devices.length()==0){
+            devicesView.addView(label("Belum ada data perangkat yang dapat ditampilkan.",12,secondary,false));
+            return;
+        }
+        devicesView.addView(label("DAFTAR DEVICE ID ("+devices.length()+")",13,accent,true));
+        for(int i=0;i<devices.length();i++){
+            JSONObject row=devices.optJSONObject(i);
+            if(row==null)continue;
+            String id=firstField(row,"deviceId","devId","deviceID","device_id","id");
+            String name=firstField(row,"deviceName","devName","name","alias");
+            String online=firstField(row,"online","isOnline","status");
+            LinearLayout card=new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(12),dp(8),dp(12),dp(8));
+            card.setBackground(rounded(panel));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=dp(7);
+            devicesView.addView(card,lp);
+            card.addView(label((i+1)+". "+(name.isEmpty()?"Kamera "+(i+1):name),14,text,true));
+            TextView idLabel=label(id.isEmpty()?"Device ID: tidak ditemukan":"Device ID: "+id,13,secondary,false);
+            idLabel.setTextIsSelectable(true);card.addView(idLabel);
+            if(!online.isEmpty())card.addView(label("Status API: "+online,12,secondary,false));
+            if(!id.isEmpty()){
+                if(!deviceIds.contains(id))deviceIds.add(id);
+                final String selected=id;
+                button(card,"Pilih dan salin ID",false).setOnClickListener(v->{
+                    deviceId.setText(selected);
+                    ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(
+                        ClipData.newPlainText("CCTV Device ID",selected));
+                    setStatus("Device ID sudah dipilih dan disalin. Tekan 'Lihat informasi Device ID'.");
+                });
+            }else if(row.names()!=null){
+                card.addView(label("Field tersedia: "+row.names().toString(),11,secondary,false));
+            }
+        }
+        devicesView.addView(label("Berhasil membaca "+deviceIds.size()+" ID. Daftar hanya ada di HP, tidak dikirim dalam laporan.",12,secondary,false));
+    }
+    private void copyAllIds(){
+        if(deviceIds.isEmpty()){setStatus("Belum ada Device ID untuk disalin.");return;}
+        StringBuilder text=new StringBuilder();
+        for(String id:deviceIds){if(text.length()>0)text.append("\n");text.append(id);}
+        ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(
+            ClipData.newPlainText("CCTV Device IDs",text.toString()));
+        setStatus(deviceIds.size()+" Device ID disalin ke clipboard.");
     }
     private TextView label(String s,int size,int color,boolean bold){
         TextView t=new TextView(this);t.setText(s);t.setTextColor(color);t.setTextSize(size);
@@ -157,7 +222,7 @@ public final class MainActivity extends Activity {
     private void share(){
         Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");
         i.putExtra(Intent.EXTRA_SUBJECT,"PBS Gwell Cloud Diagnostic");
-        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell Cloud Diagnostic v1.0.0\n"+lastReport+
+        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell Cloud Diagnostic v1.0.1\n"+lastReport+
             "\nTidak memuat password, AppToken, P2P Device ID, atau sesi akses.");
         startActivity(Intent.createChooser(i,"Bagikan laporan diagnostik"));
     }
