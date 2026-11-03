@@ -72,6 +72,8 @@ public final class MainActivity extends Activity {
         liveBtn.setOnClickListener(v->openCameraViewer(deviceId.getText().toString().trim()));
         Button p2pBtn=button(root,"▶ Native Live P2P (tanpa IP)",true);
         p2pBtn.setOnClickListener(v->openNativeP2P(deviceId.getText().toString().trim()));
+        Button cloudBtn=button(root,"☁ Cloud Recording / AI Event · cek akses",false);
+        cloudBtn.setOnClickListener(v->startActivity(new Intent(this,CloudAccessActivity.class)));
         Button logout=button(root,"Hapus sesi di memori",false);
         section(root,"03 · HASIL DIAGNOSTIK");
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(14),dp(14),dp(14),dp(14));
