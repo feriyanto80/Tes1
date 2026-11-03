@@ -14,6 +14,22 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.os.Build;
+import android.util.Base64;
+import android.content.ClipboardManager;
+import android.content.ClipData;
+import java.security.MessageDigest;
+import java.util.Arrays;
+import com.facebook.FacebookCallback;
+import com.facebook.FacebookException;
+import com.facebook.FacebookSdk;
+import com.facebook.CallbackManager;
+import com.facebook.AccessToken;
+import com.facebook.login.LoginManager;
+import com.facebook.login.LoginResult;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONObject;
@@ -23,7 +39,10 @@ public final class MainActivity extends Activity {
     private final ExecutorService executor=Executors.newSingleThreadExecutor();
     private final int background=Color.rgb(10,18,31), panel=Color.rgb(25,36,55),text=Color.WHITE,
         secondary=Color.rgb(169,184,200), accent=Color.rgb(36,197,164);
-    private EditText email,password,appId,appToken,mobileArea,deviceId;
+    private EditText email,password,appId,appToken,mobileArea,deviceId,fbAppId,fbClientToken;
+    private TextView fbStatus;
+    private CallbackManager facebookCallbacks;
+    private String configuredFacebookAppId;
     private TextView status;
     private YooseeApi api;
     private long lastAttempt=0;
@@ -38,8 +57,31 @@ public final class MainActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(22),dp(18),dp(28));sc.addView(root);setContentView(sc);
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
-        root.addView(label("Gwell Cloud Test",27,text,true));
+        root.addView(label("Gwell Cloud Test + Facebook",25,text,true));
         root.addView(label("Uji login satu akun pribadi dan daftar kamera Yoosee melalui endpoint cloud tidak resmi. Bukan aplikasi Yoosee resmi atau SDK streaming.",13,secondary,false));
+        section(root,"00 · FACEBOOK OAUTH (LOGIN PBS)");
+        root.addView(label("Login Facebook autentikasi aplikasi uji PBS. Ini BUKAN login Yoosee/Gwell dan tidak membuka kamera melalui Facebook.",12,secondary,false));
+        fbAppId=input(root,"Facebook App ID (Meta Developers)","",false);
+        fbClientToken=input(root,"Facebook Client Token","",true);
+        root.addView(label("Facebook App ID dan Client Token hanya dipakai untuk inisialisasi SDK di HP. Jangan masukkan Facebook App Secret.",11,secondary,false));
+        Button fbLogin=button(root,"Masuk dengan Facebook",true);
+        Button fbLogout=button(root,"Logout Facebook",false);
+        fbStatus=label("Facebook: belum login. Daftarkan package + key hash di Meta Developer Console.",12,secondary,false);
+        root.addView(fbStatus);
+        String keyHash=facebookKeyHash();
+        root.addView(label("Android package: "+getPackageName(),11,secondary,false));
+        root.addView(label("Key Hash (Meta Developer Console): "+keyHash,11,secondary,false));
+        button(root,"Salin Key Hash Facebook",false).setOnClickListener(v->{
+            ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("PBS Facebook Key Hash",keyHash));
+            fbStatus.setText("Key Hash disalin. Tambahkan di Meta Developers > Android.");
+        });
+        fbLogin.setOnClickListener(v->doFacebookLogin());
+        fbLogout.setOnClickListener(v->{
+            if(FacebookSdk.isInitialized()) {
+                LoginManager.getInstance().logOut();
+                fbStatus.setText("Facebook: logout selesai.");
+            } else fbStatus.setText("Facebook belum login.");
+        });
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
         appToken=input(root,"AppToken yang sah (tidak disimpan)","",true);
@@ -115,6 +157,69 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(48));
         p.topMargin=dp(10);root.addView(b,p);return b;
     }
+    private String facebookKeyHash(){
+        try {
+            Signature[] signatures;
+            if(Build.VERSION.SDK_INT>=28){
+                PackageInfo p=getPackageManager().getPackageInfo(getPackageName(),PackageManager.GET_SIGNING_CERTIFICATES);
+                signatures=p.signingInfo.getApkContentsSigners();
+            } else {
+                PackageInfo p=getPackageManager().getPackageInfo(getPackageName(),PackageManager.GET_SIGNATURES);
+                signatures=p.signatures;
+            }
+            byte[] hashed=MessageDigest.getInstance("SHA-1").digest(signatures[0].toByteArray());
+            return Base64.encodeToString(hashed,Base64.NO_WRAP);
+        } catch(Exception e) {
+            return "(gagal dibaca: "+e.getClass().getSimpleName()+")";
+        }
+    }
+    private void doFacebookLogin(){
+        String id=fbAppId.getText().toString().trim();
+        String client=fbClientToken.getText().toString().trim();
+        if(!id.matches("[0-9]{6,30}") || client.length()<8){
+            fbStatus.setText("Masukkan Facebook App ID numerik dan Client Token resmi. Keduanya harus berasal dari aplikasi Meta Developer Anda.");
+            return;
+        }
+        try {
+            if(!FacebookSdk.isInitialized()){
+                FacebookSdk.setApplicationId(id);
+                FacebookSdk.setClientToken(client);
+                FacebookSdk.sdkInitialize(getApplicationContext());
+                FacebookSdk.fullyInitialize();
+                configuredFacebookAppId=id;
+                facebookCallbacks=CallbackManager.Factory.create();
+                LoginManager.getInstance().registerCallback(facebookCallbacks,new FacebookCallback<LoginResult>(){
+                    @Override public void onSuccess(LoginResult result){
+                        AccessToken token=result.getAccessToken();
+                        if(token==null||token.isExpired()){
+                            fbStatus.setText("Facebook mengembalikan token tidak aktif.");
+                            return;
+                        }
+                        String uid=token.getUserId();
+                        String masked=uid.length()>4 ? "****"+uid.substring(uid.length()-4) : "****";
+                        fbStatus.setText("Facebook: LOGIN BERHASIL. Account: "+masked+
+                            "\nStatus ini hanya untuk identitas Facebook, bukan sesi Gwell.");
+                    }
+                    @Override public void onCancel(){fbStatus.setText("Facebook: login dibatalkan.");}
+                    @Override public void onError(FacebookException error){
+                        fbStatus.setText("Facebook: gagal — "+safeError(error.getMessage()));
+                    }
+                });
+            }
+            if(!id.equals(configuredFacebookAppId)){
+                fbStatus.setText("Facebook App ID berubah. Tutup aplikasi sepenuhnya lalu buka ulang sebelum login.");
+                return;
+            }
+            fbStatus.setText("Facebook: membuka halaman otorisasi resmi ...");
+            LoginManager.getInstance().logInWithReadPermissions(this, Arrays.asList("public_profile"));
+        } catch(Exception e){
+            fbStatus.setText("Facebook SDK: "+e.getClass().getSimpleName()+" — "+safeError(e.getMessage()));
+        }
+    }
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        if(facebookCallbacks!=null)facebookCallbacks.onActivityResult(requestCode,resultCode,data);
+    }
     private void setStatus(String report){
         lastReport=report;runOnUiThread(()->status.setText(report));
     }
@@ -157,7 +262,7 @@ public final class MainActivity extends Activity {
     private void share(){
         Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");
         i.putExtra(Intent.EXTRA_SUBJECT,"PBS Gwell Cloud Diagnostic");
-        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell Cloud Diagnostic v1.0.0\n"+lastReport+
+        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell Cloud Diagnostic v1.1.0\n"+lastReport+
             "\nTidak memuat password, AppToken, P2P Device ID, atau sesi akses.");
         startActivity(Intent.createChooser(i,"Bagikan laporan diagnostik"));
     }
