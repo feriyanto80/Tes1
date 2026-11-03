@@ -74,6 +74,8 @@ public final class MainActivity extends Activity {
         p2pBtn.setOnClickListener(v->openNativeP2P(deviceId.getText().toString().trim()));
         Button cloudBtn=button(root,"☁ Cloud Recording / AI Event · cek akses",false);
         cloudBtn.setOnClickListener(v->startActivity(new Intent(this,CloudAccessActivity.class)));
+        Button capabilityBtn=button(root,"🧪 API Capability Test",false);
+        capabilityBtn.setOnClickListener(v->{Intent test=new Intent(this,ApiCapabilityActivity.class);test.putExtra("device_id",deviceId.getText().toString().trim());startActivity(test);});
         Button logout=button(root,"Hapus sesi di memori",false);
         section(root,"03 · HASIL DIAGNOSTIK");
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(14),dp(14),dp(14),dp(14));
@@ -251,7 +253,7 @@ public final class MainActivity extends Activity {
             JSONObject result=api.login(account,pw,area.isEmpty()?"+62":area);
             int code=result.optInt("code",-1);
             if(api.hasSession()){
-                P2PSession.save(api.sessionId(),api.sessionToken());
+                P2PSession.save(api.sessionId(),api.sessionToken(),id,t);
                 return "HTTP "+result.optInt("_httpStatus")+" · Login akun BERHASIL.\nSesi hanya disimpan di memori. Pilih 'Ambil daftar perangkat akun ini'.";
             }
             P2PSession.clear();
