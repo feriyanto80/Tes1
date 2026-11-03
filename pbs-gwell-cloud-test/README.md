@@ -1,6 +1,6 @@
 # PBS Gwell Native P2P v1.2.1 — diagnostic cumulative build
 
-Full Android APK release based on v1.2.0. Package remains `com.pbsgroup.gwellcloudtest.p2pnative`, versionCode 6, versionName 1.2.1, so it updates v1.2.0 in place (debug signing identity unchanged in this workflow).
+Full Android APK release based on v1.2.0. Package is `com.pbsgroup.gwellcloudtest.p2pnative121`, versionCode 1, versionName 1.2.1. It installs side-by-side with v1.2.0, avoiding Android signature conflict because GitHub-hosted runners generate a fresh debug signing key for each build.
 
 ## v1.2.1 changes
 - Initialize IoTVideo SDK once from `PbsGwellApplication`, before player screen.
@@ -17,7 +17,7 @@ The public GWTimes IoTVideo demo obtains its `accessId/accessToken` through its 
 The SDK log is stored privately on the device and may contain sensitive vendor details. The app deliberately does not export raw SDK logs. Share only the on-screen diagnostic report copied by the button.
 
 ## Test
-1. Install the v1.2.1 APK over v1.2.0; keep the existing app installed.
+1. Keep v1.2.0 installed. Install v1.2.1 as a separate diagnostic app; no uninstall is required.
 2. Login to the same account and select an owned Device ID.
 3. Disable Wi-Fi and use mobile data to test remote P2P.
 4. Open Native Live P2P, press Start and wait at least 25 seconds.
