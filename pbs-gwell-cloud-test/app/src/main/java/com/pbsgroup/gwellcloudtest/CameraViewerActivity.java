@@ -116,6 +116,7 @@ public final class CameraViewerActivity extends Activity {
         controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);page.addView(controls);
         controls.addView(text("PTZ CONTROL",15,accent,true));
         addBtn(controls,"Deteksi profil ONVIF + token PTZ",false,v->probeOnvif());
+        addBtn(controls,"Ambil alamat RTSP otomatis dari ONVIF",true,v->autoRtsp());
         TextView hint=text("Tekan dan tahan arah untuk menggerakkan kamera; lepas untuk berhenti. Kontrol akan berfungsi jika ONVIF PTZ didukung kamera.",12,secondary,false);
         controls.addView(hint);
         LinearLayout speedBar=new LinearLayout(this);speedBar.setOrientation(LinearLayout.HORIZONTAL);controls.addView(speedBar);
@@ -243,6 +244,25 @@ public final class CameraViewerActivity extends Activity {
     private synchronized OnvifControl control(){
         if(ptz==null)ptz=new OnvifControl(hostname(),port(onvifPortInput),user(),pass());
         return ptz;
+    }
+    private void autoRtsp(){
+        try{
+            final OnvifControl control=new OnvifControl(hostname(),port(onvifPortInput),user(),pass());
+            status("Meminta ONVIF GetProfiles dan GetStreamUri ...");
+            ptzJobs.execute(()->{
+                try{
+                    control.probe();
+                    OnvifControl.StreamInfo stream=control.discoverRtsp();
+                    runOnUiThread(()->{
+                        rtspPortInput.setText(String.valueOf(stream.port));
+                        rtspPathInput.setText(stream.path);
+                        ptz=control;
+                        status("RTSP URI ditemukan dari ONVIF. Port "+stream.port+
+                            ", path "+stream.path+". Host tetap memakai IP kamera terpilih. Tekan Live RTSP.");
+                    });
+                }catch(Exception e){status("GetStreamUri gagal: "+e.getMessage());}
+            });
+        }catch(Exception e){status("ONVIF input belum lengkap: "+e.getMessage());}
     }
     private void probeOnvif(){
         try{
