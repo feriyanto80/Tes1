@@ -15,7 +15,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.tencentcs.iotvideo.IoTVideoSdk;
-import com.tencentcs.iotvideo.accountmgr.AccountMgr;
 import com.tencentcs.iotvideo.iotvideoplayer.CallTypeEnum;
 import com.tencentcs.iotvideo.iotvideoplayer.IErrorListener;
 import com.tencentcs.iotvideo.iotvideoplayer.IPreparedListener;
@@ -133,9 +132,7 @@ public final class NativeP2PActivity extends Activity {
             errorCode=-1;prepared=false;registerCallReturned=false;playSeen=false;
             event("START: SDK initialized at Application startup; "+PbsGwellApplication.getInitStatus());
             long accessId=Long.parseLong(P2PSession.id());
-            // The SDK demo also publishes the same access pair to AccountMgr.
             IoTVideoSdk.register(accessId,P2PSession.token());
-            AccountMgr.setAccessInfo(P2PSession.id(),P2PSession.token());
             registerCallReturned=true;
             event("REGISTER_CALL_RETURNED: register() is void; this does NOT prove server authentication.");
 
