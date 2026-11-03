@@ -100,7 +100,6 @@ final class YooseeApi {
         String timestamp=String.valueOf(System.currentTimeMillis()/1000L);
         values.put("x-iotvideo-nonce",nonce);
         values.put("x-iotvideo-timestamp",timestamp);
-        if (deviceId != null) values.put("deviceId",deviceId);
         StringBuilder canonical=new StringBuilder();
         for(Map.Entry<String,String> e:values.entrySet()){
             if(canonical.length()>0)canonical.append("\n");
