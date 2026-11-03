@@ -1,21 +1,21 @@
 package com.pbsgroup.gwellcloudtest;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.view.View;
-import android.view.ViewGroup;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.content.Intent;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 
 import com.tencentcs.iotvideo.IoTVideoSdk;
+import com.tencentcs.iotvideo.accountmgr.AccountMgr;
 import com.tencentcs.iotvideo.iotvideoplayer.CallTypeEnum;
 import com.tencentcs.iotvideo.iotvideoplayer.IErrorListener;
 import com.tencentcs.iotvideo.iotvideoplayer.IPreparedListener;
@@ -24,24 +24,31 @@ import com.tencentcs.iotvideo.iotvideoplayer.IoTVideoView;
 import com.tencentcs.iotvideo.iotvideoplayer.PlayerStateEnum;
 import com.tencentcs.iotvideo.iotvideoplayer.player.LivePlayer;
 
-/** Genuine native Gwell/Tencent IoTVideo SDK playback experiment (not RTSP). */
+import java.util.Locale;
+
+/** Native IoTVideo P2P diagnostics. Never exports account credentials or SDK raw logs. */
 public final class NativeP2PActivity extends Activity {
     private final int bg=Color.rgb(10,18,31),surface=Color.rgb(25,37,57),
-        accent=Color.rgb(32,196,162),white=Color.WHITE,muted=Color.rgb(178,189,202);
+            accent=Color.rgb(32,196,162),white=Color.WHITE,muted=Color.rgb(178,189,202);
+    private final Handler handler=new Handler(Looper.getMainLooper());
+    private final StringBuilder eventLog=new StringBuilder();
     private TextView status;
     private IoTVideoView videoView;
     private LivePlayer player;
-    private boolean sdkInitialized=false;
-    private boolean registered=false;
     private String deviceId="";
     private String lastState="NOT_STARTED";
     private int errorCode=-1;
+    private boolean prepared=false;
+    private boolean registerCallReturned=false;
+    private boolean playSeen=false;
+    private Runnable watchdog;
 
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
     private TextView label(String txt,int sp,int color,boolean bold){
         TextView t=new TextView(this);t.setText(txt);t.setTextSize(sp);t.setTextColor(color);
         t.setPadding(dp(4),dp(7),dp(4),dp(7));
-        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;
+        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        return t;
     }
     private GradientDrawable shape(int color){
         GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(12));return d;
@@ -50,9 +57,35 @@ public final class NativeP2PActivity extends Activity {
         Button b=new Button(this);b.setText(title);b.setTextColor(white);b.setAllCaps(false);
         b.setTextSize(14);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackground(shape(color));return b;
     }
-    private void show(String text){
-        lastState=text;
-        runOnUiThread(()->{if(!isFinishing()&&status!=null)status.setText(text);});
+    private void event(String value){
+        synchronized(eventLog){
+            if(eventLog.length()>6500)eventLog.delete(0,eventLog.length()-4500);
+            eventLog.append(System.currentTimeMillis()).append(" | ").append(value).append("\n");
+        }
+        lastState=value;
+        runOnUiThread(()->{if(!isFinishing()&&status!=null)status.setText(value);});
+    }
+    private String stateName(int s){
+        if(s==PlayerStateEnum.STATE_INITIALIZED)return "INITIALIZED";
+        if(s==PlayerStateEnum.STATE_PREPARING)return "PREPARING";
+        if(s==PlayerStateEnum.STATE_READY)return "READY";
+        if(s==PlayerStateEnum.STATE_LOADING)return "LOADING";
+        if(s==PlayerStateEnum.STATE_PLAY)return "PLAY";
+        if(s==PlayerStateEnum.STATE_PAUSE)return "PAUSE";
+        if(s==PlayerStateEnum.STATE_STOP)return "STOP";
+        if(s==PlayerStateEnum.STATE_IDLE)return "IDLE";
+        return "UNKNOWN("+s+")";
+    }
+    private String playerMetrics(){
+        if(player==null)return "player=null";
+        try{
+            return "sdkPlayState="+stateName(player.getPlayState())+
+                    "; isPlaying="+player.isPlaying()+
+                    "; video="+player.getVideoWidth()+"x"+player.getVideoHeight()+
+                    "; avBytesPerSec="+player.getAvBytesPerSec();
+        }catch(Throwable t){
+            return "metrics_error="+t.getClass().getSimpleName();
+        }
     }
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
@@ -61,21 +94,16 @@ public final class NativeP2PActivity extends Activity {
         if(deviceId==null)deviceId="";
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(bg);
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(14),dp(20),dp(14),dp(30));
-        sc.addView(body);
-        setContentView(sc);
+        body.setPadding(dp(14),dp(20),dp(14),dp(30));sc.addView(body);setContentView(sc);
         body.addView(label("PBS · GWELL NATIVE P2P",14,accent,true));
         body.addView(label("Live Video via Device ID",23,white,true));
         body.addView(label("Device ID: "+deviceId,14,muted,false));
-        body.addView(label("SDK: GWTimes IoTVideo (arsip 2020). P2P langsung melalui SDK; tidak menggunakan IP, RTSP, ataupun ONVIF.",12,muted,false));
-        LinearLayout frame=new LinearLayout(this);frame.setOrientation(LinearLayout.VERTICAL);
-        frame.setBackgroundColor(Color.BLACK);
-        LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,dp(270));vp.topMargin=dp(12);
-        body.addView(frame,vp);
-        // Video is rendered through the SDK's proprietary IoTVideoView.
+        body.addView(label("SDK: GWTimes IoTVideo. Inisialisasi aplikasi dan SDK logging aktif. Tidak memakai IP/RTSP.",12,muted,false));
+        LinearLayout frame=new LinearLayout(this);frame.setBackgroundColor(Color.BLACK);
+        LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,dp(270));vp.topMargin=dp(12);body.addView(frame,vp);
         videoView=(IoTVideoView)getLayoutInflater().inflate(R.layout.pbs_native_p2p_view,frame,false);
         frame.addView(videoView,new LinearLayout.LayoutParams(-1,-1));
-        status=label("Belum diuji. Login cloud pada halaman sebelumnya, lalu tekan Mulai P2P.",13,white,false);
+        status=label("SDK: "+PbsGwellApplication.getInitStatus()+"\nBelum memulai sesi P2P.",13,white,false);
         status.setTextIsSelectable(true);body.addView(status);
         Button play=button("▶ Mulai Live P2P",Color.rgb(27,142,120));
         Button stop=button("■ Hentikan P2P",surface);
@@ -85,88 +113,100 @@ public final class NativeP2PActivity extends Activity {
         }
         play.setOnClickListener(v->startP2P());
         stop.setOnClickListener(v->stopP2P());
-        share.setOnClickListener(v->{
-            String report="PBS Native P2P v1.2.0\nDevice ID: "+deviceId+
-                "\nState: "+lastState+"\nError SDK: "+errorCode+
-                "\nNo access token or password included.";
-            ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-            cb.setPrimaryClip(ClipData.newPlainText("PBS Gwell P2P diagnostics",report));
-            show("Laporan tanpa token disalin.\n"+lastState);
-        });
-        body.addView(label("Bukti sukses P2P hanya jika player mencapai status STATE_PLAY dan video terlihat. Jika SDK menolak token, hentikan pengujian dan gunakan kredensial developer resmi. Tidak ada PTZ native pada demo IoTVideo ini.",12,muted,false));
-        if(!P2PSession.ready()){
-            show("SESSION_MISSING: Tidak ada sesi cloud di memori. Kembali, login ulang, ambil daftar perangkat, lalu buka kembali Native P2P.");
-        }
+        share.setOnClickListener(v->copyReport());
+        body.addView(label("Versi ini merekam nama state, callback error, status prepared, dimensi video, laju data dan status player. Laporan tidak menyertakan password, accessToken, AppToken atau raw SDK log.",12,muted,false));
+        if(!P2PSession.ready())event("SESSION_MISSING: Login cloud dahulu, lalu pilih Device ID kembali.");
     }
     private void startP2P(){
         if(deviceId.isEmpty()||!deviceId.matches("[A-Za-z0-9_-]{1,100}")){
-            show("DEVICE_ID_INVALID: ID kamera belum ada.");return;
+            event("DEVICE_ID_INVALID");return;
         }
         if(!P2PSession.ready()){
-            show("SESSION_MISSING: Login Gwell Cloud diperlukan pada aplikasi ini.");return;
+            event("SESSION_MISSING: Login Gwell Cloud diperlukan.");return;
+        }
+        if(!PbsGwellApplication.getInitStatus().startsWith("SDK_INIT_OK")){
+            event("SDK_INIT_FAILED: "+PbsGwellApplication.getInitStatus());return;
         }
         try{
             stopPlayerQuietly();
-            show("SDK_INIT: Menginisialisasi SDK video. Belum membuktikan kamera tersambung.");
-            if(!sdkInitialized){
-                IoTVideoSdk.init(getApplication(),null);
-                sdkInitialized=true;
-            }
-            if(!registered){
-                long id=Long.parseLong(P2PSession.id());
-                IoTVideoSdk.register(id,P2PSession.token());
-                registered=true;
-                show("REGISTER_CALLED: SDK register() dipanggil. Keberhasilan autentikasi jaringan belum terkonfirmasi.");
-            }
+            synchronized(eventLog){eventLog.setLength(0);}
+            errorCode=-1;prepared=false;registerCallReturned=false;playSeen=false;
+            event("START: SDK initialized at Application startup; "+PbsGwellApplication.getInitStatus());
+            long accessId=Long.parseLong(P2PSession.id());
+            // The SDK demo also publishes the same access pair to AccountMgr.
+            IoTVideoSdk.register(accessId,P2PSession.token());
+            AccountMgr.setAccessInfo(P2PSession.id(),P2PSession.token());
+            registerCallReturned=true;
+            event("REGISTER_CALL_RETURNED: register() is void; this does NOT prove server authentication.");
+
             player=new LivePlayer();
             player.setDataResource(deviceId,CallTypeEnum.VIDEO_DEFINITION_HD,(short)0);
-            player.setVideoView(videoView);
             player.setPreparedListener(new IPreparedListener(){
                 @Override public void onPrepared(){
-                    show("P2P_PREPARED: Perangkat/pemutar siap. Menunggu frame dan status play.");
+                    prepared=true;event("PREPARED: SDK reports player prepared; waiting for stream/frame.");
                 }
             });
             player.setStatusListener(new IStatusListener(){
                 @Override public void onStatus(int state){
-                    if(state==PlayerStateEnum.STATE_PLAY)
-                        show("P2P_STATE_PLAY: SDK melaporkan sedang memutar. Pastikan gambar terlihat.");
-                    else if(state==PlayerStateEnum.STATE_STOP)
-                        show("P2P_STATE_STOP: Stream berhenti.");
-                    else if(state==PlayerStateEnum.STATE_PAUSE)
-                        show("P2P_STATE_PAUSE: Stream dijeda.");
-                    else show("P2P_STATE_"+state+": Menunggu sesi/video SDK.");
+                    String name=stateName(state);
+                    if(state==PlayerStateEnum.STATE_PLAY)playSeen=true;
+                    event("STATUS: "+name+" ("+state+")");
                 }
             });
             player.setErrorListener(new IErrorListener(){
                 @Override public void onError(int error){
-                    errorCode=error;
-                    show("P2P_ERROR "+error+": SDK menolak/memutus stream. Periksa kompatibilitas SDK, token, firmware dan hak perangkat.");
+                    errorCode=error;event("SDK_ERROR: code="+error+"; "+playerMetrics());
                 }
             });
-            show("P2P_CONNECTING: Mencoba LivePlayer.play() ke Device ID "+deviceId+".");
+            player.setVideoView(videoView);
+            event("PLAY_REQUEST: Device ID="+deviceId+"; definition=HD; sourceId=0");
             player.play();
+            watchdog=()->{
+                if(player!=null&&!playSeen){
+                    event("WATCHDOG_25S: no STATE_PLAY; prepared="+prepared+
+                            "; registerCallReturned="+registerCallReturned+"; "+playerMetrics());
+                }
+            };
+            handler.postDelayed(watchdog,25000);
         }catch(Throwable t){
-            show("P2P_SETUP_ERROR: "+t.getClass().getSimpleName()+
-                " — "+safeMessage(t)+". SDK tidak berhasil menyiapkan P2P.");
+            event("P2P_SETUP_ERROR: "+t.getClass().getSimpleName()+" — "+safeMessage(t));
         }
     }
     private String safeMessage(Throwable t){
         String m=t.getMessage();
         if(m==null)return "(no detail)";
-        // Avoid leaking URLs/possible access tokens in low-level error messages.
         if(m.length()>140)m=m.substring(0,140);
-        if(m.contains("accessToken")||m.contains("token="))return "(detail berpotensi memuat token)";
+        if(m.toLowerCase(Locale.ROOT).contains("token")||m.contains("accessId"))return "(detail disamarkan untuk keamanan)";
         return m;
     }
     private void stopPlayerQuietly(){
-        if(player==null)return;
-        try{player.stop();}catch(Throwable ignored){}
-        try{player.release();}catch(Throwable ignored){}
-        player=null;
+        if(watchdog!=null){handler.removeCallbacks(watchdog);watchdog=null;}
+        if(player!=null){
+            try{player.stop();}catch(Throwable ignored){}
+            try{player.release();}catch(Throwable ignored){}
+            player=null;
+        }
     }
     private void stopP2P(){
         stopPlayerQuietly();
-        show("P2P_STOPPED: Pemutaran dihentikan.");
+        event("USER_STOP: pemutaran dihentikan oleh pengguna.");
+    }
+    private void copyReport(){
+        String events;
+        synchronized(eventLog){events=eventLog.toString();}
+        String report="PBS Native P2P v1.2.1"+
+                "\nDevice ID: "+deviceId+
+                "\nSDK init: "+PbsGwellApplication.getInitStatus()+
+                "\nprepared: "+prepared+
+                "\nregisterCallReturned: "+registerCallReturned+
+                "\nplaySeen: "+playSeen+
+                "\nerrorCode: "+errorCode+
+                "\nmetrics: "+playerMetrics()+
+                "\nEVENTS:\n"+events+
+                "\nCredentials and raw SDK logs intentionally excluded.";
+        ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        cb.setPrimaryClip(ClipData.newPlainText("PBS Gwell P2P diagnostics",report));
+        event("DIAGNOSTIC_COPIED: laporan aman disalin ke clipboard.");
     }
     @Override protected void onResume(){
         super.onResume();
