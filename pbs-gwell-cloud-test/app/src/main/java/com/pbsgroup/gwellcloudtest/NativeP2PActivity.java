@@ -109,7 +109,7 @@ public final class NativeP2PActivity extends Activity {
             stopPlayerQuietly();
             show("SDK_INIT: Menginisialisasi SDK video. Belum membuktikan kamera tersambung.");
             if(!sdkInitialized){
-                IoTVideoSdk.init(getApplicationContext(),null);
+                IoTVideoSdk.init(getApplication(),null);
                 sdkInitialized=true;
             }
             if(!registered){
