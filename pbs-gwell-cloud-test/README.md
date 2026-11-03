@@ -1,35 +1,31 @@
-# PBS Gwell Live + PTZ v1.1.1
+# PBS Gwell Native P2P v1.2.0 — experimental APK
 
-Perbaikan kumulatif dari **PBS Gwell Live + PTZ v1.1.0** (termasuk seluruh fitur inventaris Gwell Cloud v1.0.1).
+Cumulative Android release based on **PBS Gwell Live PTZ v1.1.1**. Adds **genuine native IoTVideo SDK LivePlayer**, connected to Device IDs returned by the user's already-working Gwell Cloud account session. **Not RTSP or ONVIF**.
 
-## Mengapa v1.1.0 menampilkan layar hitam?
-Tombol Live pada v1.1.0 merupakan pemutar **RTSP berbasis IP**, sementara daftar perangkat Gwell Cloud hanya memberikan **Device ID**, bukan IP lokal atau sesi streaming. Pada layar sebelumnya, input IP kamera kosong. Kesalahan `IllegalArgumentException: IP/hostname tidak valid` terjadi **sebelum aplikasi mencoba koneksi RTSP**, bukan karena password atau Device ID salah.
+## Implementation
+- Existing cloud login and 8-device inventory retained.
+- New **Native Live P2P** button per device (plus original RTSP/ONVIF Live + PTZ).
+- Native AAR from GWTimes/IoTVideo-Android, archived public upstream binary (`app/libs/iotvideo-release.aar`), downloaded in GitHub Actions. This is proprietary third-party code with no confirmed redistribution/commercial license. Do not deploy commercially without agreement from the rights holder.
+- Native `IoTVideoSdk.init(context,null)` then `IoTVideoSdk.register(accessId,accessToken)`, then `LivePlayer.setDataResource(deviceId,...)` and `play()`.
+- Cloud session passed only through in-memory app process; no password or token extras in Android intents; no persistent credentials.
+- SDK callbacks show explicit statuses: `SDK_INIT`, `REGISTER_CALLED`, `P2P_CONNECTING`, `P2P_STATE_PLAY`, `P2P_ERROR <code>`. A successful `register()` call alone is **NOT** proof of backend registration.
+- The existing local RTSP/ONVIF module remains separate and unchanged.
 
-## Penambahan v1.1.1
-- **Cari kamera ONVIF di WiFi ONT ini**: WS-Discovery multicast ke `239.255.255.250:3702` melalui WiFi aktif. Membutuhkan WiFi yang sama dengan kamera, multicast dapat diblokir oleh AP isolation.
-- Tampilkan kandidat IP/port hasil respons ONVIF; pengguna memilih perangkat yang sesuai. Tidak menganggap kandidat ONVIF otomatis identik dengan Device ID Gwell.
-- **Ambil alamat RTSP otomatis dari ONVIF**: GetProfiles + GetStreamUri; mengisi RTSP Port dan Path dari kamera jika firmware mendukung. Host RTSP tetap IP kamera yang telah dipilih, bukan host pihak ketiga dari XML.
-- Pesan kesalahan berbeda saat IP kosong: perangkat Gwell ditemukan di Cloud tetapi belum ada rute IP untuk live RTSP.
-- Tombol **Buka Yoosee untuk Live P2P** sebagai cara menonton video jarak jauh menggunakan aplikasi resmi bila tersedia.
-- Live RTSP TCP, ONVIF PTZ 8 arah, profile token, tombol Stop, fullscreen, daftar Device ID dan pemeriksaan cloud tetap dipertahankan.
-- Tidak meminta password ke server PBS dan tidak menyimpan password lokal secara permanen.
+## Crucial compatibility disclaimer
+`openapi-iot.cloudlinks.cn` cloud login (as used in YooseeExploit client) and 2020 GWTimes/Tencent IoTVideo SDK login may issue incompatible tokens or belong to different IoTVideo product namespaces. We have **not** verified that the 8 cameras' IDs are accessible via this native SDK. A negative callback can indicate incompatible access credential, product scope, cloud namespace or firmware, not that P2P is impossible.
 
-## Sangat penting
-**Versi ini bukan penyambungan P2P Gwell ke aplikasi PBS.** Kode SDK lama `GwellDemo` menggunakan sesi dan verifikasi P2P khusus, sedangkan `GWTimes/IoTVideo-Android` memerlukan integrasi SDK `IoTVideoSdk.register(accessId,accessToken)` dari backend produk terkait. Keduanya **belum terbukti dapat menerima begitu saja** token yang diperoleh dari API `openapi-iot.cloudlinks.cn` pada `YooseeExploit/Client/yoosee.py`. Jangan menganggap delapan Device ID sebagai URL stream P2P.
+**PTZ over the native P2P channel is NOT implemented**: GWTimes/IoTVideo Android demo's `directionCtl()` is empty. The existing ONVIF PTZ remains available via local IP only. Do not confuse UI controls with actual P2P PTZ.
 
-**Untuk video lintas ONT tanpa konfigurasi jaringan** perlu: SDK P2P Gwell yang diotorisasi dengan AppID/AppToken/package khusus, atau jaringan privat CCTV/VPN dari OLT/core operator.
+## Test procedure
+1. Install `PBS_Gwell_Native_P2P_v1.2.0.apk` on Android; package `com.pbsgroup.gwellcloudtest.p2pnative` can coexist with prior debug APKs.
+2. Enable cellular internet, **disable WiFi**, to ensure this tests remote cloud P2P.
+3. Login to your *own* Yoosee/Gwell account using developer credentials that you are authorized to use.
+4. Click *Ambil daftar perangkat akun ini* and pick one of your device IDs.
+5. Click *Uji Live P2P native*. The app will try to register SDK and start native LivePlayer.
+6. If status changes to **P2P_STATE_PLAY** and a real camera image appears, the P2P pathway works. Otherwise copy the diagnostic report, not your login password or vendor tokens.
+7. Do not mistake success on inventory API for streaming success. Do not repeatedly brute-force tokens or accounts.
 
-## Uji lapangan
-1. Instal APK v1.1.1 di HP. App ID Android terpisah dari v1.1.0 karena APK debug dari GitHub Actions menggunakan sertifikat yang dapat berubah.
-2. Hubungkan HP ke SSID WiFi ONT tempat satu kamera fisik berada.
-3. Login dan ambil daftar Device ID.
-4. Tekan **Live + PTZ** pada kamera yang ingin diuji.
-5. Ketuk **Cari kamera ONVIF di WiFi ONT ini**. Bila berhasil, pilih kandidat IP. Bila tidak ditemukan, kamera mungkin tidak mengaktifkan ONVIF, atau multicast diblokir; lihat IP di DHCP ONT.
-6. Masukkan **username/password kamera**, yang mungkin berbeda dari akun Yoosee Cloud.
-7. Ketuk **Ambil alamat RTSP otomatis dari ONVIF** bila tersedia, lalu **Live RTSP**.
-8. Ketuk **Deteksi profil ONVIF + token PTZ**, tekan-tahan arah dan lepaskan untuk stop.
-9. Jika akses melalui internet seluler tanpa VPN, hasil kosong adalah normal; gunakan aplikasi resmi Yoosee untuk sementara.
-
-## Paket
-Repository: `feriyanto80/Tes1`, branch `pbs-gwell-live-ptz-v1.1.1`.
-Download APK langsung setelah build di `pbs-gwell-cloud-test/releases/PBS_Gwell_Live_PTZ_v1.1.1.apk`.
+## Deployment notes
+- Build artifact (debug signed) placed in GitHub repository `pbs-gwell-cloud-test/releases`, avoiding ChatGPT Library links.
+- This source builds against a publicly archived SDK. SDK binary distribution and continued service access are subject to upstream rights and policy; obtain an official license and compatible SDK for production.
+- If platform/vendor does not accept the current tokens, proper SDK credentials, device binding, product ID/namespace and SDK version must come from Gwell/Yoosee. We cannot bypass authentication.
