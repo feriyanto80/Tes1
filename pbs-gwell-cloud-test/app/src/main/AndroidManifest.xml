@@ -6,8 +6,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <queries><package android:name="com.yoosee" /></queries>
     <application android:allowBackup="false" android:usesCleartextTraffic="true"
-        android:label="PBS Gwell Live PTZ Fix"
+        android:label="PBS Gwell P2P Native Test"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".NativeP2PActivity" android:exported="false" />
         <activity android:name=".CameraViewerActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
