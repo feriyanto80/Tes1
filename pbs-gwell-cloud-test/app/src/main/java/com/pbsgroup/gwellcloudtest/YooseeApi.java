@@ -33,6 +33,8 @@ final class YooseeApi {
     }
 
     boolean hasSession() { return accessTokenFull != null && accessId != null; }
+    String sessionId() { return accessId; }
+    String sessionToken() { return accessTokenFull; }
     void close() { accessTokenFull = null; accessId = null; }
 
     JSONObject login(String account, String password, String countryCode) throws Exception {
