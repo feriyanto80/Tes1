@@ -1,0 +1,46 @@
+name: Build PBS Gwell Cloud Test APK
+on:
+  push:
+    branches: [pbs-yoosee-cloud-single-account]
+    paths: ['pbs-gwell-cloud-test/**', '.github/workflows/pbs-gwell-cloud-test.yml']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK components
+        run: |
+          SDKMGR=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          "$SDKMGR" "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build Android diagnostic APK
+        run: gradle -p pbs-gwell-cloud-test :app:assembleDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PBS_Gwell_Cloud_Test_v1.0.0
+          path: pbs-gwell-cloud-test/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish APK directly to GitHub
+        run: |
+          mkdir -p pbs-gwell-cloud-test/releases
+          cp pbs-gwell-cloud-test/app/build/outputs/apk/debug/app-debug.apk pbs-gwell-cloud-test/releases/PBS_Gwell_Cloud_Test_v1.0.0.apk
+          cd pbs-gwell-cloud-test/releases
+          sha256sum PBS_Gwell_Cloud_Test_v1.0.0.apk > PBS_Gwell_Cloud_Test_v1.0.0.apk.sha256
+          cd ../../
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pbs-gwell-cloud-test/releases/
+          if git diff --staged --quiet; then echo "Unchanged APK"; else
+            git commit -m "Publish PBS Gwell Cloud Test APK [skip ci]"
+            git push origin HEAD:pbs-yoosee-cloud-single-account
+          fi
