@@ -14,6 +14,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.content.Intent;
+import android.view.WindowInsets;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import java.util.ArrayList;
@@ -42,9 +43,14 @@ public final class MainActivity extends Activity {
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(background);sc.setFillViewport(true);
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18),dp(22),dp(18),dp(28));sc.addView(root);setContentView(sc);
+        sc.setOnApplyWindowInsetsListener((v,insets)->{
+            android.graphics.Insets a=insets.getInsets(WindowInsets.Type.systemBars());
+            root.setPadding(dp(18),a.top+dp(18),dp(18),a.bottom+dp(30));
+            return insets;
+        });
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
-        root.addView(label("Gwell Cloud Test",27,text,true));
-        root.addView(label("Uji login satu akun pribadi dan daftar kamera Yoosee melalui endpoint cloud tidak resmi. Bukan aplikasi Yoosee resmi atau SDK streaming.",13,secondary,false));
+        root.addView(label("Gwell Live + PTZ",27,text,true));
+        root.addView(label("Daftar kamera dari Gwell Cloud dan live RTSP + kontrol ONVIF PTZ lewat jaringan IP yang dapat dijangkau. Device ID P2P belum dapat digunakan untuk live video.",13,secondary,false));
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
         appToken=input(root,"AppToken yang sah (tidak disimpan)","",true);
@@ -62,6 +68,8 @@ public final class MainActivity extends Activity {
         copyIds.setOnClickListener(v->copyAllIds());
         deviceId=input(root,"Device ID untuk melihat metadata (opsional)","",false);
         Button detail=button(root,"Lihat informasi Device ID",false);
+        Button liveBtn=button(root,"▶ Buka LIVE VIDEO + PTZ",true);
+        liveBtn.setOnClickListener(v->openCameraViewer(deviceId.getText().toString().trim()));
         Button logout=button(root,"Hapus sesi di memori",false);
         section(root,"03 · HASIL DIAGNOSTIK");
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(14),dp(14),dp(14),dp(14));
@@ -70,7 +78,7 @@ public final class MainActivity extends Activity {
         box.addView(status);root.addView(box);
         Button share=button(root,"Bagikan laporan tanpa kredensial",false);
         root.addView(label("Keamanan: TLS certificate verification aktif. Tidak ada pencarian kombinasi password, impor daftar akun, penyimpanan token permanen, atau kirim data ke server PBS.",11,secondary,false));
-        root.addView(label("Untuk video P2P, masih diperlukan SDK streaming vendor dan lisensi yang sesuai. API login ini tidak menghasilkan URL RTSP.",11,secondary,false));
+        root.addView(label("Live RTSP dan ONVIF PTZ bekerja dengan alamat IP yang dapat dijangkau dari HP (WiFi sama/VPN/VLAN). Login cloud + P2P ID tidak membuat video dapat diputar langsung dari internet; SDK resmi Gwell P2P tetap diperlukan.",11,secondary,false));
         login.setOnClickListener(v->runLogin());
         list.setOnClickListener(v->execute("DEVICE_LIST",()->{
             ensureSession();
@@ -103,6 +111,14 @@ public final class MainActivity extends Activity {
         share.setOnClickListener(v->share());
     }
 
+    private void openCameraViewer(String id){
+        Intent i=new Intent(this,CameraViewerActivity.class);
+        i.putExtra("device_id",id);
+        i.putExtra("rtsp_port","554");
+        i.putExtra("rtsp_path","/onvif1");
+        i.putExtra("onvif_port","5000");
+        startActivity(i);
+    }
     private String firstField(JSONObject item,String... fieldNames){
         for(String field:fieldNames){
             String value=item.optString(field,"").trim();
@@ -141,6 +157,7 @@ public final class MainActivity extends Activity {
                         ClipData.newPlainText("CCTV Device ID",selected));
                     setStatus("Device ID sudah dipilih dan disalin. Tekan 'Lihat informasi Device ID'.");
                 });
+                button(card,"▶ Live + PTZ",true).setOnClickListener(v->openCameraViewer(selected));
             }else if(row.names()!=null){
                 card.addView(label("Field tersedia: "+row.names().toString(),11,secondary,false));
             }
@@ -222,7 +239,7 @@ public final class MainActivity extends Activity {
     private void share(){
         Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");
         i.putExtra(Intent.EXTRA_SUBJECT,"PBS Gwell Cloud Diagnostic");
-        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell Cloud Diagnostic v1.0.1\n"+lastReport+
+        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell Cloud Diagnostic v1.1.0\n"+lastReport+
             "\nTidak memuat password, AppToken, P2P Device ID, atau sesi akses.");
         startActivity(Intent.createChooser(i,"Bagikan laporan diagnostik"));
     }
