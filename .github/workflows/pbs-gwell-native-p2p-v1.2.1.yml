@@ -4,6 +4,9 @@ on:
     branches: [pbs-gwell-native-p2p-v1.2.1]
     paths: ['pbs-gwell-cloud-test/**', '.github/workflows/pbs-gwell-native-p2p-v1.2.1.yml']
   workflow_dispatch:
+concurrency:
+  group: pbs-gwell-native-p2p-v1.2.1-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ubuntu-latest
