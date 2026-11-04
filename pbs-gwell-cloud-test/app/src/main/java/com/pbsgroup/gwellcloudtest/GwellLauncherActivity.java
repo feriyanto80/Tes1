@@ -32,6 +32,7 @@ public final class GwellLauncherActivity extends Activity {
     private EditText deviceInput;
     private TextView diagnostic;
     private String lastDiagnostic="NO_ATTEMPT";
+    private boolean launchedNative=false;
 
     private int dp(int n){
         return (int)(n*getResources().getDisplayMetrics().density+0.5f);
@@ -79,7 +80,7 @@ public final class GwellLauncherActivity extends Activity {
 
         root.addView(label("PBS GROUP · GWell P2P-Core",12,accent,true));
         root.addView(label("Native GWell Live",24,white,true));
-        root.addView(label("v1.3.1 · Layar persiapan yang selalu dapat dibuka tanpa login Cloud API. Live membutuhkan sesi GWell dan konfigurasi resmi.",13,muted,false));
+        root.addView(label("v1.3.2 · Stable launcher dengan proses GWell terisolasi. Jika runtime SDK lama crash, layar utama PBS tetap berjalan dan laporan crash dapat disalin.",13,muted,false));
         root.addView(label("Device ID kamera",13,white,true));
 
         deviceInput=new EditText(this);
@@ -97,11 +98,12 @@ public final class GwellLauncherActivity extends Activity {
 
         Button launch=button(root,"▶ Buka GWell Native Player",true);
         launch.setOnClickListener(v->launchNative());
-        Button copy=button(root,"Salin diagnostik launcher",false);
+        Button copy=button(root,"Salin diagnostik & crash terakhir",false);
         copy.setOnClickListener(v->copyDiagnostic());
         diagnostic=label("READY: layar launcher berhasil dibuka. Masukkan/pastikan Device ID, lalu buka native player.",13,white,false);
         diagnostic.setTextIsSelectable(true);
         root.addView(diagnostic);
+        root.addView(label("Status proses sebelumnya: "+NativeCrashLedger.report(this),11,muted,false));
         root.addView(label("Catatan: 8003 pada SDK IoTVideo tidak otomatis berlaku untuk SDK GWell. Tidak ada binding/unbinding kamera atau pengambilalihan sesi Yoosee.",12,muted,false));
     }
     private void report(String state){
@@ -122,11 +124,15 @@ public final class GwellLauncherActivity extends Activity {
             return;
         }
         try{
-            ComponentName component=new ComponentName(this,GwellNativeActivity.class);
+            ComponentName component=new ComponentName(getPackageName(),
+                "com.pbsgroup.gwellcloudtest.GwellNativeActivity");
             getPackageManager().getActivityInfo(component,0);
-            Intent intent=new Intent(this,GwellNativeActivity.class);
+            Intent intent=new Intent();
+            intent.setComponent(component);
             intent.putExtra("device_id",id);
-            report("GWell native Activity ditemukan. Membuka player untuk Device ID terpilih.");
+            NativeCrashLedger.launching(this);
+            launchedNative=true;
+            report("NATIVE_LAUNCH_REQUESTED: memulai SDK GWell dalam proses terpisah. Kembali ke layar ini jika native gagal.");
             startActivity(intent);
         }catch(PackageManager.NameNotFoundException error){
             report("NATIVE_ACTIVITY_MISSING: GwellNativeActivity tidak terdaftar di APK.");
@@ -137,12 +143,19 @@ public final class GwellLauncherActivity extends Activity {
             report("NATIVE_ACTIVITY_LAUNCH_FAILED: "+error.getClass().getSimpleName());
         }
     }
+    @Override protected void onResume(){
+        super.onResume();
+        if(launchedNative && diagnostic!=null){
+            lastDiagnostic="RETURNED_FROM_NATIVE: inspect the latest native process state and Java crash report";
+            diagnostic.setText(lastDiagnostic+"\n"+NativeCrashLedger.report(this));
+        }
+    }
     private void copyDiagnostic(){
-        String status="PBS GWell Native Launcher v1.3.1"+
+        String status="PBS GWell Native Launcher v1.3.2"+
             "\nstatus="+lastDiagnostic+
             "\nactivityPackage="+getPackageName()+
             "\ndeviceIdPresent="+(deviceInput!=null&&!deviceInput.getText().toString().trim().isEmpty())+
-            "\ncredentialsExcluded=true";
+            "\ncredentialsExcluded=true\n"+NativeCrashLedger.report(this);
         ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(
             ClipData.newPlainText("GWell launcher diagnostic",status));
         Toast.makeText(this,"Diagnostik launcher disalin tanpa kredensial.",Toast.LENGTH_SHORT).show();
