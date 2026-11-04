@@ -17,6 +17,10 @@ import org.json.JSONObject;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.net.URL;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.net.SocketTimeoutException;
+import javax.net.ssl.SSLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -270,6 +274,7 @@ public final class EndpointInventoryActivity extends Activity {
         status("Menyusun katalog dan memeriksa route. Scanner memakai OPTIONS; HEAD hanya untuk kandidat read-only. Mohon tunggu.");
         scanWorker.execute(()->{
             List<Endpoint> endpoints=catalog();
+            JSONArray dnsDiagnostics=hostDiagnostics();
             List<Callable<JSONObject>> tasks=new ArrayList<>();
             for(Endpoint endpoint:endpoints)tasks.add(()->probeEndpoint(endpoint));
             JSONArray results=new JSONArray();
@@ -291,7 +296,7 @@ public final class EndpointInventoryActivity extends Activity {
             JSONObject report=new JSONObject();
             try{
                 report.put("application","PBS Yoosee Endpoint Inventory Scanner");
-                report.put("version","1.2.5");
+                report.put("version","1.2.6");
                 report.put("generatedAtUtc",utcNow());
                 report.put("testMode","READ_ONLY_OPTIONS_AND_HEAD");
                 report.put("credentialsIncluded",false);
@@ -299,10 +304,11 @@ public final class EndpointInventoryActivity extends Activity {
                 report.put("authenticatedRequestsSent",false);
                 report.put("mutationRequestsSent",false);
                 report.put("endpointCount",endpoints.size());
+                report.put("dnsDiagnostics",dnsDiagnostics);
                 report.put("results",results);
                 report.put("summary",summarize(results));
-                report.put("interpretation","OPTIONS/HEAD response indicates transport or route-level response only. It does not prove supported business method, authentication, app entitlement, device ownership, VAS permission, or successful playback.");
-                report.put("hostNotes","Legacy API host candidates: api1.cloudlinks.cn then api2.cloudlinks.cn. OpenAPI host mapping follows the supplied inventory and observed app hosts. VAS API host is an unconfirmed candidate. /v2/auth host is not mapped and is not probed.");
+                report.put("interpretation","OPTIONS/HEAD response indicates transport or route-level response only. DNS failure means the candidate hostname did not resolve from this network; it does not prove the API is discontinued. HTTP 404 from OPTIONS/HEAD does not prove GET/POST route absence. No business authentication or entitlement is inferred.");
+                report.put("hostNotes","Legacy api1/api2 are unconfirmed candidate hosts and are checked with DNS diagnostics. OpenAPI and playback hosts follow observed application/API responses. vasapi.cloudlinks.cn:10443 remains an unconfirmed candidate. /v2/auth host is not mapped and is not probed.");
                 report.put("safetyNotes","State-changing, credential, firmware, sharing, delete, billing, playback, secret and token-generation endpoints receive OPTIONS only or are marked not probed when host is unknown. No GET/POST/PATCH/DELETE request is sent.");
                 report.put("overall","COMPLETED_WITH_LIMITATIONS");
             }catch(Exception ignored){}
@@ -315,12 +321,41 @@ public final class EndpointInventoryActivity extends Activity {
         });
     }
 
+    private JSONArray hostDiagnostics(){
+        JSONArray out=new JSONArray();
+        String[] hosts={"api1.cloudlinks.cn","api2.cloudlinks.cn","openapi-iot.cloudlinks.cn",
+                "saas-playback.cloudlinks.cn","vasapi.cloudlinks.cn"};
+        for(String host:hosts){
+            long start=System.currentTimeMillis();
+            JSONObject item=new JSONObject();
+            try{
+                InetAddress[] addresses=InetAddress.getAllByName(host);
+                item.put("host",host);
+                item.put("status",addresses!=null&&addresses.length>0?"DNS_RESOLVED":"DNS_NO_ADDRESS");
+                item.put("resolvedAddressCount",addresses==null?0:addresses.length);
+                item.put("latencyMs",System.currentTimeMillis()-start);
+                item.put("resolvedAddressesIncluded",false);
+            }catch(Exception e){
+                try{
+                    item.put("host",host);
+                    item.put("status",e instanceof UnknownHostException?"DNS_LOOKUP_FAILED":"DNS_ERROR");
+                    item.put("errorClass",e.getClass().getSimpleName());
+                    item.put("resolvedAddressCount",0);
+                    item.put("latencyMs",System.currentTimeMillis()-start);
+                    item.put("resolvedAddressesIncluded",false);
+                }catch(Exception ignored){}
+            }
+            out.put(item);
+        }
+        return out;
+    }
+
     private JSONObject probeEndpoint(Endpoint e){
         JSONObject item=new JSONObject();
         JSONArray attempts=new JSONArray();
         String bestStatus=e.hosts.length==0?"HOST_MAPPING_REQUIRED":"NO_RESPONSE";
         String bestHost="";
-        int bestPriority=-1;
+        int bestPriority=-10;
         try{
             item.put("group",e.group);item.put("path",e.path);item.put("riskClass",e.risk);
             item.put("hostConfidence",e.hostConfidence);
@@ -329,32 +364,43 @@ public final class EndpointInventoryActivity extends Activity {
             if(e.hosts.length==0){
                 item.put("status","HOST_MAPPING_REQUIRED");
                 item.put("details","Endpoint dicatat, tetapi base host belum dapat dipastikan. Tidak ada request jaringan yang dikirim.");
-                item.put("attempts",attempts);
+                item.put("attemptCount",0);item.put("attempts",attempts);
                 return item;
             }
             for(String host:e.hosts){
                 JSONObject options=probeOne("OPTIONS",host,e.path);
                 attempts.put(options);
-                int p=priority(options.optString("status"));
-                if(p>bestPriority){bestPriority=p;bestStatus=options.optString("status");bestHost=host;}
-                boolean retryHost=isRetryable(options.optString("status"));
+                String optionsStatus=options.optString("status");
+                int p=priority(optionsStatus);
+                if(p>bestPriority){
+                    bestPriority=p;bestStatus=optionsStatus;
+                    bestHost=isHttpResponseStatus(optionsStatus)?host:"";
+                }
+                boolean retryHost=isRetryable(optionsStatus);
                 if(e.headSafe){
                     JSONObject head=probeOne("HEAD",host,e.path);
                     attempts.put(head);
-                    p=priority(head.optString("status"));
-                    if(p>bestPriority){bestPriority=p;bestStatus=head.optString("status");bestHost=host;}
-                    retryHost=retryHost||isRetryable(head.optString("status"));
-                    if(isPositiveResponse(options.optString("status"))||isPositiveResponse(head.optString("status")))break;
-                }else if(!retryHost){
-                    break;
+                    String headStatus=head.optString("status");
+                    p=priority(headStatus);
+                    if(p>bestPriority){
+                        bestPriority=p;bestStatus=headStatus;
+                        bestHost=isHttpResponseStatus(headStatus)?host:"";
+                    }
+                    retryHost=retryHost||isRetryable(headStatus);
+                    if(isPositiveResponse(optionsStatus)||isPositiveResponse(headStatus))break;
                 }
                 if(!retryHost)break;
             }
-            item.put("status",bestStatus);item.put("respondingHost",bestHost);
+            item.put("status",bestStatus);
+            item.put("respondingHost",bestHost);
+            item.put("attemptCount",attempts.length());
             item.put("attempts",attempts);
-            item.put("details","Route-level probe only. HTTP response does not prove API authentication or entitlement.");
+            item.put("details","Route-level probe only. HTTP response does not prove API authentication or entitlement. DNS/network failures are reported separately and do not prove the route is discontinued.");
         }catch(Exception ex){
-            try{item.put("status","SCAN_ERROR");item.put("details",safeClass(ex));item.put("attempts",attempts);}catch(Exception ignored){}
+            try{
+                item.put("status","SCAN_ERROR");item.put("details",safeClass(ex));
+                item.put("attemptCount",attempts.length());item.put("attempts",attempts);
+            }catch(Exception ignored){}
         }
         return item;
     }
@@ -369,7 +415,7 @@ public final class EndpointInventoryActivity extends Activity {
             c.setRequestMethod(method);
             c.setConnectTimeout(3500);c.setReadTimeout(3500);
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent","PBS-Gwell-Endpoint-Inventory/1.2.5");
+            c.setRequestProperty("User-Agent","PBS-Gwell-Endpoint-Inventory/1.2.6");
             c.setRequestProperty("Accept","application/json");
             int http=c.getResponseCode();
             String allow=safeHeader(c.getHeaderField("Allow"));
@@ -379,8 +425,14 @@ public final class EndpointInventoryActivity extends Activity {
             result.put("latencyMs",System.currentTimeMillis()-start);
         }catch(Exception e){
             try{
+                String status;
+                if(e instanceof UnknownHostException)status="DNS_LOOKUP_FAILED";
+                else if(e instanceof SocketTimeoutException)status="NETWORK_TIMEOUT";
+                else if(e instanceof SSLException)status="TLS_ERROR";
+                else if(e instanceof java.net.ConnectException)status="CONNECTION_ERROR";
+                else status="NETWORK_ERROR";
                 result.put("method",method);result.put("host",host);
-                result.put("status","NETWORK_ERROR");result.put("errorClass",e.getClass().getSimpleName());
+                result.put("status",status);result.put("errorClass",e.getClass().getSimpleName());
                 result.put("latencyMs",System.currentTimeMillis()-start);
             }catch(Exception ignored){}
         }finally{if(c!=null)c.disconnect();}
@@ -404,12 +456,19 @@ public final class EndpointInventoryActivity extends Activity {
         if("HTTP_RESPONSE_OTHER".equals(status))return 2;
         if("SERVER_ERROR".equals(status))return 1;
         if("PATH_NOT_FOUND".equals(status))return 0;
-        return -1;
+        if("NETWORK_TIMEOUT".equals(status))return -1;
+        if("TLS_ERROR".equals(status)||"CONNECTION_ERROR".equals(status))return -2;
+        if("DNS_LOOKUP_FAILED".equals(status))return -3;
+        if("NETWORK_ERROR".equals(status))return -4;
+        return -5;
     }
+
     private JSONObject timeoutResult(Endpoint e){
         JSONObject o=new JSONObject();
         try{o.put("group",e.group);o.put("path",e.path);o.put("riskClass",e.risk);
-            o.put("hostConfidence",e.hostConfidence);o.put("status","SCAN_TIMEOUT");
+            o.put("hostConfidence",e.hostConfidence);o.put("probeMethods",e.headSafe?"OPTIONS,HEAD":"OPTIONS_ONLY");
+            o.put("status","SCAN_TIMEOUT");o.put("requestBodySent",false);o.put("credentialsSent",false);
+            o.put("attemptCount",0);o.put("attempts",new JSONArray());
             o.put("details","Batas waktu pemindaian tercapai; endpoint belum dinyatakan tidak tersedia.");}
         catch(Exception ignored){}return o;
     }
@@ -418,10 +477,14 @@ public final class EndpointInventoryActivity extends Activity {
         try{o.put("status","SCAN_ERROR");o.put("details",safeClass(ex));}catch(Exception ignored){}
         return o;
     }
+
     private JSONObject summarize(JSONArray results){
         JSONObject s=new JSONObject();
-        int ok=0,redirect=0,restricted=0,notFound=0,methodUnsupported=0,serverError=0,
-            network=0,unmapped=0,timeout=0,other=0,notProbed=0;
+        int ok=0,redirect=0,restricted=0,notFound=0,methodUnsupported=0,serverError=0;
+        int networkEndpoints=0,dnsEndpoints=0,timeoutEndpoints=0,tlsEndpoints=0,connectionEndpoints=0;
+        int unmapped=0,scanTimeout=0,scanError=0,noResponse=0,other=0,notProbed=0;
+        int attemptTotal=0,aOk=0,aRedirect=0,aRestricted=0,aNotFound=0,aMethod=0,aServer=0;
+        int aDns=0,aTimeout=0,aTls=0,aConnection=0,aNetwork=0,aOther=0;
         for(int i=0;i<results.length();i++){
             JSONObject r=results.optJSONObject(i);if(r==null)continue;
             String status=r.optString("status");
@@ -431,23 +494,73 @@ public final class EndpointInventoryActivity extends Activity {
             else if("PATH_NOT_FOUND".equals(status))notFound++;
             else if("METHOD_NOT_SUPPORTED".equals(status))methodUnsupported++;
             else if("SERVER_ERROR".equals(status))serverError++;
-            else if("NETWORK_ERROR".equals(status))network++;
+            else if("DNS_LOOKUP_FAILED".equals(status)){dnsEndpoints++;networkEndpoints++;}
+            else if("NETWORK_TIMEOUT".equals(status)){timeoutEndpoints++;networkEndpoints++;}
+            else if("TLS_ERROR".equals(status)){tlsEndpoints++;networkEndpoints++;}
+            else if("CONNECTION_ERROR".equals(status)){connectionEndpoints++;networkEndpoints++;}
+            else if("NETWORK_ERROR".equals(status)){networkEndpoints++;}
+            else if("NO_RESPONSE".equals(status)){noResponse++;networkEndpoints++;}
             else if("HOST_MAPPING_REQUIRED".equals(status))unmapped++;
-            else if("SCAN_TIMEOUT".equals(status))timeout++;
+            else if("SCAN_TIMEOUT".equals(status))scanTimeout++;
+            else if("SCAN_ERROR".equals(status))scanError++;
             else if("NOT_PROBED".equals(status))notProbed++;
             else other++;
+
+            JSONArray attempts=r.optJSONArray("attempts");
+            if(attempts==null)continue;
+            for(int j=0;j<attempts.length();j++){
+                JSONObject a=attempts.optJSONObject(j);if(a==null)continue;
+                attemptTotal++;
+                String as=a.optString("status");
+                if("HTTP_2XX_RESPONSE".equals(as))aOk++;
+                else if("HTTP_REDIRECT".equals(as))aRedirect++;
+                else if("AUTH_OR_ACCESS_RESTRICTED".equals(as))aRestricted++;
+                else if("PATH_NOT_FOUND".equals(as))aNotFound++;
+                else if("METHOD_NOT_SUPPORTED".equals(as))aMethod++;
+                else if("SERVER_ERROR".equals(as))aServer++;
+                else if("DNS_LOOKUP_FAILED".equals(as))aDns++;
+                else if("NETWORK_TIMEOUT".equals(as))aTimeout++;
+                else if("TLS_ERROR".equals(as))aTls++;
+                else if("CONNECTION_ERROR".equals(as))aConnection++;
+                else if("NETWORK_ERROR".equals(as))aNetwork++;
+                else aOther++;
+            }
         }
+        JSONObject attemptSummary=new JSONObject();
         try{
+            attemptSummary.put("total",attemptTotal);attemptSummary.put("http2xx",aOk);
+            attemptSummary.put("redirect",aRedirect);attemptSummary.put("authOrAccessRestricted",aRestricted);
+            attemptSummary.put("pathNotFound",aNotFound);attemptSummary.put("methodNotSupported",aMethod);
+            attemptSummary.put("serverError",aServer);attemptSummary.put("dnsLookupFailed",aDns);
+            attemptSummary.put("networkTimeout",aTimeout);attemptSummary.put("tlsError",aTls);
+            attemptSummary.put("connectionError",aConnection);attemptSummary.put("networkError",aNetwork);
+            attemptSummary.put("other",aOther);
             s.put("total",results.length());s.put("http2xx",ok);s.put("redirect",redirect);
             s.put("authOrAccessRestricted",restricted);s.put("pathNotFound",notFound);
             s.put("methodNotSupported",methodUnsupported);s.put("serverError",serverError);
-            s.put("networkError",network);s.put("hostMappingRequired",unmapped);
-            s.put("scanTimeout",timeout);s.put("other",other);s.put("notProbed",notProbed);
-        }catch(Exception ignored){}return s;
+            s.put("networkError",networkEndpoints);s.put("dnsLookupFailed",dnsEndpoints);
+            s.put("networkTimeout",timeoutEndpoints);s.put("tlsError",tlsEndpoints);
+            s.put("connectionError",connectionEndpoints);s.put("noResponse",noResponse);
+            s.put("hostMappingRequired",unmapped);s.put("scanTimeout",scanTimeout);
+            s.put("scanError",scanError);s.put("other",other);s.put("notProbed",notProbed);
+            s.put("attemptSummary",attemptSummary);
+        }catch(Exception ignored){}
+        return s;
     }
+
     private boolean isRetryable(String status){
-        return "NETWORK_ERROR".equals(status)||"SERVER_ERROR".equals(status);
+        return "NETWORK_ERROR".equals(status)||"DNS_LOOKUP_FAILED".equals(status)||
+            "NETWORK_TIMEOUT".equals(status)||"TLS_ERROR".equals(status)||
+            "CONNECTION_ERROR".equals(status)||"SERVER_ERROR".equals(status)||
+            "PATH_NOT_FOUND".equals(status);
     }
+    private boolean isHttpResponseStatus(String status){
+        return "HTTP_2XX_RESPONSE".equals(status)||"HTTP_REDIRECT".equals(status)||
+            "AUTH_OR_ACCESS_RESTRICTED".equals(status)||"METHOD_NOT_SUPPORTED".equals(status)||
+            "HTTP_RESPONSE_OTHER".equals(status)||"PATH_NOT_FOUND".equals(status)||
+            "SERVER_ERROR".equals(status);
+    }
+
     private boolean isPositiveResponse(String status){
         return "HTTP_2XX_RESPONSE".equals(status)||"HTTP_REDIRECT".equals(status)||
             "AUTH_OR_ACCESS_RESTRICTED".equals(status)||"METHOD_NOT_SUPPORTED".equals(status)||
@@ -479,6 +592,8 @@ public final class EndpointInventoryActivity extends Activity {
             " · 404: "+s.optInt("pathNotFound")+
             " · Method unsupported: "+s.optInt("methodNotSupported")+
             " · Network error: "+s.optInt("networkError")+
+            " · DNS gagal: "+s.optInt("dnsLookupFailed")+
+            " · Timeout: "+s.optInt("networkTimeout")+
             " · Host belum dipetakan: "+s.optInt("hostMappingRequired")+
             "\nStatus: "+report.optString("overall");
     }
