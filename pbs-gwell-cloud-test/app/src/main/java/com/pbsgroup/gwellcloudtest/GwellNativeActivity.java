@@ -60,6 +60,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     private String deviceId="";
     private String userId="";
     private String lastOutcome="NOT_STARTED";
+    private String runtimeClassReport="NOT_TESTED";
     private volatile boolean sdkInitialized=false;
     private volatile boolean loginAccepted=false;
     private volatile boolean p2pConnected=false;
@@ -161,7 +162,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
             root.setPadding(dp(16),bars.top+dp(20),dp(16),bars.bottom+dp(30));
             return insets;
         });
-        root.addView(label("PBS · GWell P2P-CORE v1.3.3",13,accent));
+        root.addView(label("PBS · GWell P2P-CORE v1.3.4",13,accent));
         root.addView(label("Native GWell Live · Vendor SDK",23,white));
         root.addView(label("Device ID: "+deviceId,14,muted));
         root.addView(label("SDK nyata dari jwkj/GwellDemo. Login native GWell memerlukan kredensial aplikasi dengan APPVersion yang didaftarkan vendor. Login Cloudlinks PBS tidak otomatis menyediakan SessionID1/2 dan P2PVerifyCode1/2.",12,muted));
@@ -181,6 +182,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
         stateView=label("Belum login native GWell.",13,white);
         stateView.setTextIsSelectable(true);root.addView(stateView);
 
+        button(root,"0 · Uji dependency SDK (tanpa login)",false,this::inspectRuntime);
         button(root,"1 · Init GWell SDK & login akun",true,this::startGwellLogin);
         button(root,"2 · Periksa P2P Device & Versi",false,this::requestDeviceStatus);
         button(root,"3 · Mulai Live GWell P2P",true,this::startMonitor);
@@ -193,6 +195,11 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     }
 
     private String get(EditText f){return f.getText().toString().trim();}
+    private void inspectRuntime(){
+        runtimeClassReport=GwellRuntimeInspector.classpathReport();
+        event(runtimeClassReport);
+    }
+
     private void startGwellLogin(){
         if(sdkInitialized || loginAccepted){
             event("SESSION_ALREADY_INITIALIZED: jangan melakukan init/login ulang pada sesi sama. Buka ulang layar untuk login baru.");
@@ -208,13 +215,21 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
             event("APPVERSION_INVALID: gunakan format vendor XX.XX.XX.XX, jangan Android versionName.");
             return;
         }
+        runtimeClassReport=GwellRuntimeInspector.classpathReport();
+        event(runtimeClassReport);
+        if(runtimeClassReport.contains("=MISSING")){
+            event("GWELL_INIT_BLOCKED_MISSING_DEPENDENCY: classpath incomplete, no login attempted");
+            return;
+        }
         try{
             P2PSpecial.getInstance().init(getApplication(),appId,appToken,version);
             sdkInitialized=true;
             buildVideoView();
             event("GWELL_SDK_INITIALIZED: AppID/AppToken/APPVersion submitted; server-side application authorization NOT proven");
         }catch(Throwable t){
-            event("GWELL_INIT_FAILED: "+t.getClass().getSimpleName()+"; no credentials exported");
+            event("GWELL_INIT_FAILED: "+t.getClass().getSimpleName()+
+                "; "+GwellRuntimeInspector.safeLinkageCause(t)+
+                "; credentials excluded");
             return;
         }
         // Old SDK login is callback-based; never retry automatically to avoid throttling.
@@ -401,9 +416,10 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     private void copyReport(){
         String entries;
         synchronized(log){entries=log.toString();}
-        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.3"+
+        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.4"+
             "\nDevice ID: "+maskedDevice()+
             "\nlegacySdk: jwkj/GwellDemo P2P-Core 0.5.4 (archived 2019)"+
+            "\nclassCheck: "+runtimeClassReport+
             "\nappVersionProvided: "+(!get(appVersionInput).isEmpty())+
             "\nvendorLoginAccepted: "+loginAccepted+
             "\np2pConnectResult: "+p2pConnected+
