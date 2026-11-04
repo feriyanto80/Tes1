@@ -127,7 +127,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
             root.setPadding(dp(16),bars.top+dp(20),dp(16),bars.bottom+dp(30));
             return insets;
         });
-        root.addView(label("PBS · GWell P2P-CORE v1.3.0",13,accent));
+        root.addView(label("PBS · GWell P2P-CORE v1.3.1",13,accent));
         root.addView(label("Native GWell Live · Vendor SDK",23,white));
         root.addView(label("Device ID: "+deviceId,14,muted));
         root.addView(label("SDK nyata dari jwkj/GwellDemo. Login native GWell memerlukan kredensial aplikasi dengan APPVersion yang didaftarkan vendor. Login Cloudlinks PBS tidak otomatis menyediakan SessionID1/2 dan P2PVerifyCode1/2.",12,muted));
@@ -365,7 +365,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     private void copyReport(){
         String entries;
         synchronized(log){entries=log.toString();}
-        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.0"+
+        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.1"+
             "\nDevice ID: "+maskedDevice()+
             "\nlegacySdk: jwkj/GwellDemo P2P-Core 0.5.4 (archived 2019)"+
             "\nappVersionProvided: "+(!get(appVersionInput).isEmpty())+
