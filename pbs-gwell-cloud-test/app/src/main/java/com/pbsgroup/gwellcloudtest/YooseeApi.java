@@ -113,6 +113,7 @@ final class YooseeApi {
         values.put("host",HOST);
         values.put("language","ZH");
         values.put("lastDeviceId",lastId);
+        if(deviceId!=null)values.put(deviceIdParameter,deviceId);
         values.put("pkgName","Yoosee.PC");
         values.put("terminalOS","1");
         values.put("x-iotvideo-accessid",accessId);
