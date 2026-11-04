@@ -111,6 +111,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     }
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
+        NativeCrashLedger.opened(this);
         getWindow().setStatusBarColor(bg);
         getWindow().setNavigationBarColor(bg);
         deviceId=getIntent().getStringExtra("device_id");
@@ -127,7 +128,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
             root.setPadding(dp(16),bars.top+dp(20),dp(16),bars.bottom+dp(30));
             return insets;
         });
-        root.addView(label("PBS · GWell P2P-CORE v1.3.1",13,accent));
+        root.addView(label("PBS · GWell P2P-CORE v1.3.2",13,accent));
         root.addView(label("Native GWell Live · Vendor SDK",23,white));
         root.addView(label("Device ID: "+deviceId,14,muted));
         root.addView(label("SDK nyata dari jwkj/GwellDemo. Login native GWell memerlukan kredensial aplikasi dengan APPVersion yang didaftarkan vendor. Login Cloudlinks PBS tidak otomatis menyediakan SessionID1/2 dan P2PVerifyCode1/2.",12,muted));
@@ -154,6 +155,8 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
         button(root,"Salin laporan (tanpa kredensial)",false,this::copyReport);
         root.addView(label("PENTING: kode APPVersion bukan Android versionName. Identitas APPID/APPTOKEN, APPVersion, dan package name mungkin terikat pada vendor. Paket ini berisi SDK contoh arsip 2019; bukan bypass akses.",11,muted));
         root.addView(label("SDK mengembalikan status koneksi, versi P2P, vAccept/vConnectReady, dan video PTS. Koneksi sukses belum menjamin video muncul. Tidak melakukan bind/unbind, reset, atau mengambil token Yoosee resmi.",11,muted));
+        root.addView(label("Mode stabilisasi: mesin native berjalan di proses Android terpisah. Jika proses berhenti, kembali ke launcher untuk menyalin diagnostik. Kredensial Cloudlinks dari proses utama tidak otomatis tersedia di proses terpisah.",11,muted));
+        NativeCrashLedger.uiReady(this);
     }
 
     private String get(EditText f){return f.getText().toString().trim();}
@@ -365,7 +368,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     private void copyReport(){
         String entries;
         synchronized(log){entries=log.toString();}
-        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.1"+
+        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.2"+
             "\nDevice ID: "+maskedDevice()+
             "\nlegacySdk: jwkj/GwellDemo P2P-Core 0.5.4 (archived 2019)"+
             "\nappVersionProvided: "+(!get(appVersionInput).isEmpty())+
@@ -384,6 +387,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     }
     @Override public void onDestroy(){
         closed=true;generation++;
+        NativeCrashLedger.exited(this);
         try{if(channelId>=0)P2PHandler.getInstance().finish(channelId);}catch(Throwable ignored){}
         try{if(p2pConnected)P2PHandler.getInstance().p2pDisconnect();}catch(Throwable ignored){}
         worker.shutdownNow();p2pListener=null;settingListener=null;
