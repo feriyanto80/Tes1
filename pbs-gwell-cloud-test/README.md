@@ -1,4 +1,85 @@
-# PBS Yoosee v1.3.2 — Native GWell Crash Guard
+# PBS Yoosee v1.3.3 — Android 16 Dynamic Receiver Compatibility
+
+Cumulative release based on v1.3.2. Existing Cloud API/IoTVideo/RTSP/GWell native
+code and protective native process isolation are preserved.
+
+## Crash addressed (device: Android API 36)
+
+The v1.3.2 crash report contains:
+- `process=GWELL_ISOLATED`
+- `java.lang.SecurityException`
+- `ContextImpl.registerReceiver` / `IActivityManager.registerReceiverWithFeature`
+- It happens **before** native login and before GWell video starts.
+
+Official Android 14 behavior change: apps targeting API 34+ must specify
+`Context.RECEIVER_NOT_EXPORTED` or `Context.RECEIVER_EXPORTED` for dynamically
+registered receivers that are not exclusively for system broadcasts.
+
+Documentation:
+https://developer.android.com/about/versions/14/behavior-changes-14
+
+## Changes in v1.3.3
+
+- Overridden pre-Android-14 `registerReceiver` overloads in both
+  `GwellNativeActivity` and `PbsGwellApplication`.
+- Invoke the original Android registration first. **Only if** its exception
+  specifically mentions missing `RECEIVER_EXPORTED` and
+  `RECEIVER_NOT_EXPORTED`, retry using `RECEIVER_NOT_EXPORTED`.
+- Does **not** blindly export SDK receivers to other applications.
+- Preserves the Android system-only broadcast exception because a successful
+  original call is never intercepted.
+- A genuine unrelated `SecurityException` continues to fail and gets
+  captured by the isolated-process crash ledger.
+- Report now includes `receiverCompat=DYNAMIC_RECEIVER_NOT_EXPORTED_RETRY_APPLIED`
+  if a legacy receiver registration was repaired.
+- Expands safely redacted Java crash trace up to 32 class/method frames,
+  so the first vendor class can be identified without exporting exception
+  messages, user account, passwords, tokens, or full camera Device ID.
+- Retains process isolation `:gwell`, live GWell SDK integration, IoTVideo
+  diagnostic, Cloudlinks, camera list, RTSP/ONVIF, and report export.
+
+### What it does not prove
+
+The crash's **exception message** was intentionally excluded from the report.
+The receiver export requirement matches the Android OS behavior and the
+stack location, but a different type of `SecurityException` is still possible.
+This compatibility shim only acts when the OS error specifically contains both
+required flag names. Android runtime testing is needed to confirm the crash
+is gone. It does not resolve the earlier unrelated IoTVideo error 8003.
+
+Some GWell SDK features might depend on external app broadcasts that cannot
+be received by `RECEIVER_NOT_EXPORTED`. If the app launches but callbacks
+do not arrive, the vendor must document which broadcast actions need external
+senders before assigning an exported receiver and permission protection.
+
+## Test instructions
+
+1. Install `PBS_Yoosee_Native_GWell_v1.3.3.apk` side by side with v1.3.2.
+   Distinct applicationId: `com.pbsgroup.gwellcloudtest.p2pnative133gwell`.
+2. On the main screen select camera 38819486 and tap **GWell Native
+   P2P-Core LIVE**. The stable launcher will open.
+3. Tap **Buka GWell Native Player**.
+4. If native player opens, verify its form is visible *before entering any
+   sensitive credentials*. This tests the original crash.
+5. Return to launcher and use **Salin diagnostik & crash terakhir**.
+   Look for `receiverCompat`, `state=NATIVE_UI_READY`, and `javaCrash`.
+6. Only after UI stability is proven, attempt GWell vendor login with
+   the properly authorized AppID, AppToken and APPVersion. Do not enter
+   credentials into an untrusted app or share them in diagnostics.
+7. If the native process crashes with `javaCrash=NOT_RECORDED`,
+   capture native `adb logcat -b crash` output after redacting secrets.
+
+This is an experimental debug APK based on archived GWell SDK binaries.
+Successful GitHub compilation is **not** proof of device runtime
+compatibility, working P2P authentication, or a live camera stream.
+Vendor licensing and current Android support should be validated for
+production use.
+
+---
+
+## Historical release notes
+
+## PBS Yoosee v1.3.2 — Native GWell Crash Guard
 
 **Cumulative release**, based on v1.3.1, retaining all Cloudlinks API, IoTVideo, RTSP/ONVIF, and GWell P2P-Core integration.
 
