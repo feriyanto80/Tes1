@@ -170,8 +170,8 @@ public final class EndpointInventoryActivity extends Activity {
         addOpenApi(out,"OpenAPI · User","/openapi/app/user/",new String[]{
             "login/account","login/third","login/loginScanQrcode","login/thirdIsExist",
             "regist","emailRegist","logout","unregist","modifyPwd","forgotPwd","resetPwd",
-            "sendSmsCode","sendEmailCode","verifyCode","sendSmsCodeSecure","queryInfo",
-            "modifyInfo","getConfig","accountBind","thirdBind","thirdUnbind","thirdRegist",
+            "sendSmsCode","sendEmailCode","verifyCode","sendSmsCodeSecure",
+            "modifyInfo","accountBind","thirdBind","thirdUnbind","thirdRegist",
             "regionConfirm","reGenUsrAcceccToken","pushTokenBind","uploadLog",
             "checkEmailExist","checkMobileExist","getCosCredential","cos/getAuthInfo"
         },false,"AUTH_ACCOUNT_OR_PRIVACY_SENSITIVE");
