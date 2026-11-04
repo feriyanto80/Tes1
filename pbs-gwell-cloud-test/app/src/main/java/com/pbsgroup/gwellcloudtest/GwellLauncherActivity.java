@@ -80,7 +80,7 @@ public final class GwellLauncherActivity extends Activity {
 
         root.addView(label("PBS GROUP · GWell P2P-Core",12,accent,true));
         root.addView(label("Native GWell Live",24,white,true));
-        root.addView(label("v1.3.3 · Receiver compatibility Android 14/16 dan proses GWell terisolasi. Jika runtime SDK lama crash, layar utama PBS tetap berjalan dan laporan crash dapat disalin.",13,muted,false));
+        root.addView(label("v1.3.4 · Receiver compatibility Android 14/16 dan proses GWell terisolasi. Jika runtime SDK lama crash, layar utama PBS tetap berjalan dan laporan crash dapat disalin.",13,muted,false));
         root.addView(label("Device ID kamera",13,white,true));
 
         deviceInput=new EditText(this);
@@ -151,7 +151,7 @@ public final class GwellLauncherActivity extends Activity {
         }
     }
     private void copyDiagnostic(){
-        String status="PBS GWell Native Launcher v1.3.3"+
+        String status="PBS GWell Native Launcher v1.3.4"+
             "\nstatus="+lastDiagnostic+
             "\nactivityPackage="+getPackageName()+
             "\ndeviceIdPresent="+(deviceInput!=null&&!deviceInput.getText().toString().trim().isEmpty())+
