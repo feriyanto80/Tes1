@@ -1,6 +1,11 @@
 package com.pbsgroup.gwellcloudtest;
 
 import android.app.Application;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Handler;
 import android.os.Build;
 import android.util.Log;
 import com.tencentcs.iotvideo.IoTVideoSdk;
@@ -13,6 +18,34 @@ public final class PbsGwellApplication extends Application {
     private static volatile String initStatus = "SDK_NOT_INITIALIZED";
 
     public static String getInitStatus() { return initStatus; }
+
+    // Some archived native SDK helpers register receivers via
+    // getApplicationContext() rather than the Activity itself.
+    @Override public Intent registerReceiver(BroadcastReceiver receiver,IntentFilter filter){
+        try{
+            return super.registerReceiver(receiver,filter);
+        }catch(SecurityException missingFlag){
+            if(android.os.Build.VERSION.SDK_INT<34 || receiver==null ||
+               !GwellReceiverCompat.isMissingExportFlag(missingFlag))throw missingFlag;
+            Intent result=super.registerReceiver(receiver,filter,Context.RECEIVER_NOT_EXPORTED);
+            NativeCrashLedger.receiverCompatApplied(this,"Application");
+            return result;
+        }
+    }
+
+    @Override public Intent registerReceiver(BroadcastReceiver receiver,IntentFilter filter,
+                                             String permission,Handler scheduler){
+        try{
+            return super.registerReceiver(receiver,filter,permission,scheduler);
+        }catch(SecurityException missingFlag){
+            if(android.os.Build.VERSION.SDK_INT<34 || receiver==null ||
+               !GwellReceiverCompat.isMissingExportFlag(missingFlag))throw missingFlag;
+            Intent result=super.registerReceiver(receiver,filter,permission,scheduler,
+                Context.RECEIVER_NOT_EXPORTED);
+            NativeCrashLedger.receiverCompatApplied(this,"Application");
+            return result;
+        }
+    }
 
     @Override public void onCreate() {
         super.onCreate();
