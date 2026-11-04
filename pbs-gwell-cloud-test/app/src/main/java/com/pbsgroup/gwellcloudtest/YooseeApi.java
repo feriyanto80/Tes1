@@ -85,10 +85,22 @@ final class YooseeApi {
     JSONObject deviceInfo(String deviceId) throws Exception {
         if(!deviceId.matches("^[A-Za-z0-9_\\-]{1,100}$"))
             throw new IllegalArgumentException("Format Device ID tidak valid.");
-        return signedGet("device/getDeviceInfo","0",deviceId);
+        return signedGet("device/getDeviceInfo","0",deviceId,"deviceId");
+    }
+
+    JSONObject deviceInfoQuery(String deviceId, String idParameter) throws Exception {
+        if(!deviceId.matches("^[A-Za-z0-9_\\-]{1,100}$"))
+            throw new IllegalArgumentException("Format Device ID tidak valid.");
+        if(!"devId".equals(idParameter) && !"deviceId".equals(idParameter))
+            throw new IllegalArgumentException("Nama parameter tidak diizinkan.");
+        return signedGet("device/infoQuery","0",deviceId,idParameter);
     }
 
     private JSONObject signedGet(String route, String lastId, String deviceId) throws Exception {
+        return signedGet(route,lastId,deviceId,"deviceId");
+    }
+
+    private JSONObject signedGet(String route, String lastId, String deviceId, String deviceIdParameter) throws Exception {
         if (!hasSession()) throw new IllegalStateException("Login ke akun sendiri terlebih dahulu.");
         String tokenUrl=accessTokenFull.substring(0,96);
         TreeMap<String,String> values = new TreeMap<>();
@@ -121,7 +133,7 @@ final class YooseeApi {
         for(String k:new String[]{"accessToken","apiVersion","appId","appName","appToken",
                 "appVersion","language","lastDeviceId","pkgName","terminalOS"})
             params.put(k,values.get(k));
-        if(deviceId!=null)params.put("deviceId",deviceId);
+        if(deviceId!=null)params.put(deviceIdParameter,deviceId);
         StringBuilder query=new StringBuilder();
         for(Map.Entry<String,String> e:params.entrySet()){
             if(query.length()>0)query.append("&");
