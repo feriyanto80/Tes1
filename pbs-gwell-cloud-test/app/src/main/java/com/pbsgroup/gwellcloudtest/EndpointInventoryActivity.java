@@ -38,7 +38,7 @@ public final class EndpointInventoryActivity extends Activity {
     private final int bg=Color.rgb(10,18,31),panel=Color.rgb(25,36,55),
             white=Color.WHITE,muted=Color.rgb(169,184,200),accent=Color.rgb(36,197,164);
     private final ExecutorService scanWorker=Executors.newSingleThreadExecutor();
-    private final ExecutorService networkPool=Executors.newFixedThreadPool(12);
+    private final ExecutorService networkPool=Executors.newFixedThreadPool(8);
     private Button runButton;
     private TextView statusView;
     private String reportText="{\"status\":\"NOT_RUN\"}";
@@ -337,13 +337,18 @@ public final class EndpointInventoryActivity extends Activity {
                 attempts.put(options);
                 int p=priority(options.optString("status"));
                 if(p>bestPriority){bestPriority=p;bestStatus=options.optString("status");bestHost=host;}
+                boolean retryHost=isRetryable(options.optString("status"));
                 if(e.headSafe){
                     JSONObject head=probeOne("HEAD",host,e.path);
                     attempts.put(head);
                     p=priority(head.optString("status"));
                     if(p>bestPriority){bestPriority=p;bestStatus=head.optString("status");bestHost=host;}
+                    retryHost=retryHost||isRetryable(head.optString("status"));
+                    if(isPositiveResponse(options.optString("status"))||isPositiveResponse(head.optString("status")))break;
+                }else if(!retryHost){
+                    break;
                 }
-                if(bestPriority>=5)break;
+                if(!retryHost)break;
             }
             item.put("status",bestStatus);item.put("respondingHost",bestHost);
             item.put("attempts",attempts);
@@ -439,6 +444,17 @@ public final class EndpointInventoryActivity extends Activity {
             s.put("networkError",network);s.put("hostMappingRequired",unmapped);
             s.put("scanTimeout",timeout);s.put("other",other);s.put("notProbed",notProbed);
         }catch(Exception ignored){}return s;
+    }
+    private boolean isRetryable(String status){
+        return "NETWORK_ERROR".equals(status)||"SERVER_ERROR".equals(status);
+    }
+    private boolean isPositiveResponse(String status){
+        return "HTTP_2XX_RESPONSE".equals(status)||"HTTP_REDIRECT".equals(status)||
+            "AUTH_OR_ACCESS_RESTRICTED".equals(status)||"METHOD_NOT_SUPPORTED".equals(status)||
+            "HTTP_RESPONSE_OTHER".equals(status);
+    }
+    private void status(String value){
+        runOnUiThread(()->{if(statusView!=null)statusView.setText(value);});
     }
     private String safeHeader(String value){
         if(value==null||value.trim().isEmpty())return "not_returned";
