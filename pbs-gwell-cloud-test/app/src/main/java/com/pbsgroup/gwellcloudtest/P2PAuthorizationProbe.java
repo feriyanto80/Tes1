@@ -92,9 +92,12 @@ final class P2PAuthorizationProbe {
         String cate=numericSmall(field(row,"deviceCate","devCate","deviceCategory"));
         String backend=backendValue(field(row,"p2pProtocol","protocol","deviceProtocol",
             "backend","sdkType"));
+        String relationKind = "1".equals(relation) ? "OWNER_LIKE" :
+            "2".equals(relation) ? "GUEST_LIKE" : "UNKNOWN";
         return new Result(state,description+
-            "; relationCode="+relation+"; deviceCate="+cate+
-            "; protocolHint="+backend,
+            "; relationCode="+relation+"; relationKind="+relationKind+
+            "; relationMapping=GWTimes_demo_not_verified_for_Cloudlinks_API"+
+            "; deviceCate="+cate+"; protocolHint="+backend,
             listed,relation,cate,backend);
     }
     private static String numericSmall(String value){
