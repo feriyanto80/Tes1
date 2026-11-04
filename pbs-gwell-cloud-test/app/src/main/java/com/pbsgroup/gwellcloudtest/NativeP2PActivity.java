@@ -42,10 +42,10 @@ public final class NativeP2PActivity extends Activity {
     private LivePlayer player;
     private String deviceId="";
     private String lastState="NOT_STARTED";
-    private int errorCode=-1;
-    private boolean prepared=false;
-    private boolean registerCallReturned=false;
-    private boolean playSeen=false;
+    private volatile int errorCode=-1;
+    private volatile boolean prepared=false;
+    private volatile boolean registerCallReturned=false;
+    private volatile boolean playSeen=false;
     private Runnable watchdog;
     private long sessionStartElapsed=0L;
     private long registerReturnedElapsed=0L;
@@ -56,7 +56,7 @@ public final class NativeP2PActivity extends Activity {
     private volatile String preflightState="NOT_TESTED";
     private volatile String preflightDetail="";
     private int preflightGeneration=0;
-    private boolean mediaVerified=false;
+    private volatile boolean mediaVerified=false;
     private Runnable mediaObserver;
     private String selectedDefinition="HD";
 
@@ -167,6 +167,7 @@ public final class NativeP2PActivity extends Activity {
         }
         final int generation=++preflightGeneration;
         if(launchAfter)stopPlayerQuietly();
+        synchronized(eventLog){eventLog.setLength(0);}
         preflightState="RUNNING";preflightDetail="";
         event("AUTH_PREFLIGHT_START: authenticated read-only device list and device info; no binding changes");
         authorizationExecutor.execute(()->{
@@ -195,7 +196,6 @@ public final class NativeP2PActivity extends Activity {
         }
         try{
             stopPlayerQuietly();
-            synchronized(eventLog){eventLog.setLength(0);}
             errorCode=-1;prepared=false;registerCallReturned=false;playSeen=false;
             sessionStartElapsed=SystemClock.elapsedRealtime();registerReturnedElapsed=0L;preparedElapsed=0L;playElapsed=0L;
             networkAtStart=networkSnapshot();mediaVerified=false;
