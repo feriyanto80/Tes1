@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
             return insets;
         });
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
-        root.addView(label("PBS Yoosee Native GWell v1.3.0",27,text,true));
+        root.addView(label("PBS Yoosee Native GWell v1.3.1",27,text,true));
         root.addView(label("Login Cloud API, GWell Native P2P-Core live eksperimental, IoTVideo diagnostics, serta RTSP/ONVIF alternatif.",13,secondary,false));
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
@@ -123,13 +123,22 @@ public final class MainActivity extends Activity {
     }
 
     private void openGwellNative(String id){
-        if(id==null || !id.matches("[A-Za-z0-9_-]{1,100}")){
-            setStatus("Pilih Device ID kamera dahulu.");
-            return;
+        // A blank Device ID must NEVER make the button look unresponsive.
+        // The stable launcher opens first and accepts a manually entered ID.
+        try{
+            Intent launcher=new Intent(this,GwellLauncherActivity.class);
+            if(id!=null && id.matches("[A-Za-z0-9_-]{1,100}"))
+                launcher.putExtra("device_id",id);
+            startActivity(launcher);
+        }catch(RuntimeException error){
+            String message="GWELL_LAUNCH_ERROR: "+error.getClass().getSimpleName();
+            setStatus(message);
+            android.widget.Toast.makeText(this,message,android.widget.Toast.LENGTH_LONG).show();
+        }catch(LinkageError error){
+            String message="GWELL_SDK_LINK_ERROR: "+error.getClass().getSimpleName();
+            setStatus(message);
+            android.widget.Toast.makeText(this,message,android.widget.Toast.LENGTH_LONG).show();
         }
-        Intent nativeGwell=new Intent(this,GwellNativeActivity.class);
-        nativeGwell.putExtra("device_id",id);
-        startActivity(nativeGwell);
     }
     private void openNativeP2P(String id){
         if(!P2PSession.ready()){
@@ -192,6 +201,7 @@ public final class MainActivity extends Activity {
                 });
                 button(card,"▶ Live + PTZ",true).setOnClickListener(v->openCameraViewer(selected));
                 button(card,"▶ Uji Live P2P native",true).setOnClickListener(v->openNativeP2P(selected));
+                button(card,"▶ GWell P2P-Core (pilih kamera)",true).setOnClickListener(v->openGwellNative(selected));
             }else if(row.names()!=null){
                 card.addView(label("Field tersedia: "+row.names().toString(),11,secondary,false));
             }
@@ -276,7 +286,7 @@ public final class MainActivity extends Activity {
     private void share(){
         Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");
         i.putExtra(Intent.EXTRA_SUBJECT,"PBS Gwell Cloud Diagnostic");
-        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.3.0\n"+lastReport+
+        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.3.1\n"+lastReport+
             "\nTidak memuat password, AppToken, P2P Device ID, atau sesi akses.");
         startActivity(Intent.createChooser(i,"Bagikan laporan diagnostik"));
     }
