@@ -40,7 +40,7 @@ public final class CloudAccessActivity extends Activity {
         root.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(root);setContentView(scroll);
         root.addView(text("PBS CCTV · CLOUD ACCESS",12,accent,true));
         root.addView(text("Cloud Recording & AI Event",25,white,true));
-        root.addView(text("Status integrasi v1.3.2. Halaman ini memeriksa kesiapan akses, bukan menampilkan rekaman yang belum mendapat otorisasi vendor.",13,muted,false));
+        root.addView(text("Status integrasi v1.3.3. Halaman ini memeriksa kesiapan akses, bukan menampilkan rekaman yang belum mendapat otorisasi vendor.",13,muted,false));
         section(root,"Yoosee AppID / AppToken",
                 "Kredensial aplikasi yang digunakan untuk login Cloudlinks dan mengambil daftar perangkat.",
                 "TERSEDIA DI KONFIGURASI LOGIN — validasi dilakukan saat login.");
