@@ -28,6 +28,8 @@ import com.tencentcs.iotvideo.iotvideoplayer.PlayerStateEnum;
 import com.tencentcs.iotvideo.iotvideoplayer.player.LivePlayer;
 
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Native IoTVideo P2P diagnostics. Never exports account credentials or SDK raw logs. */
 public final class NativeP2PActivity extends Activity {
@@ -50,6 +52,13 @@ public final class NativeP2PActivity extends Activity {
     private long preparedElapsed=0L;
     private long playElapsed=0L;
     private String networkAtStart="UNKNOWN";
+    private final ExecutorService authorizationExecutor=Executors.newSingleThreadExecutor();
+    private volatile String preflightState="NOT_TESTED";
+    private volatile String preflightDetail="";
+    private int preflightGeneration=0;
+    private boolean mediaVerified=false;
+    private Runnable mediaObserver;
+    private String selectedDefinition="HD";
 
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
     private TextView label(String txt,int sp,int color,boolean bold){
@@ -133,17 +142,46 @@ public final class NativeP2PActivity extends Activity {
         frame.addView(videoView,new LinearLayout.LayoutParams(-1,-1));
         status=label("SDK: "+PbsGwellApplication.getInitStatus()+"\nBelum memulai sesi P2P.",13,white,false);
         status.setTextIsSelectable(true);body.addView(status);
-        Button play=button("▶ Mulai Live P2P",Color.rgb(27,142,120));
+        Button preflight=button("🔎 Cek relasi akun–kamera (read-only)",surface);
+        Button play=button("▶ Diagnostik Live P2P HD",Color.rgb(27,142,120));
+        Button playSd=button("▶ Diagnostik Live P2P SD",Color.rgb(27,142,120));
         Button stop=button("■ Hentikan P2P",surface);
         Button share=button("Salin Hasil Uji (Tanpa Token)",surface);
-        for(Button x:new Button[]{play,stop,share}){
+        for(Button x:new Button[]{preflight,play,playSd,stop,share}){
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(47));lp.topMargin=dp(9);body.addView(x,lp);
         }
-        play.setOnClickListener(v->startP2P());
+        preflight.setOnClickListener(v->runAuthorizationPreflight(false));
+        play.setOnClickListener(v->{selectedDefinition="HD";runAuthorizationPreflight(true);});
+        playSd.setOnClickListener(v->{selectedDefinition="SD";runAuthorizationPreflight(true);});
         stop.setOnClickListener(v->stopP2P());
         share.setOnClickListener(v->copyReport());
-        body.addView(label("Versi ini merekam nama state, callback error, status prepared, dimensi video, laju data dan status player. Laporan tidak menyertakan password, accessToken, AppToken atau raw SDK log.",12,muted,false));
+        body.addView(label("v1.2.7 · Preflight relasi perangkat menggunakan Cloud API read-only; daftar dapat dipaginasi. Kode 8003 pada GWTimes ASrv berarti relasi device–user tidak sah, tetapi kesesuaian mapping Android harus dikonfirmasi. Tidak melakukan bind/unbind otomatis dan tidak mengubah izin kamera.",12,muted,false));
         if(!P2PSession.ready())event("SESSION_MISSING: Login cloud dahulu, lalu pilih Device ID kembali.");
+    }
+    private void runAuthorizationPreflight(boolean launchAfter) {
+        if(deviceId.isEmpty()||!deviceId.matches("[A-Za-z0-9_-]{1,100}")){
+            event("DEVICE_ID_INVALID");return;
+        }
+        if(!P2PSession.ready()){
+            event("SESSION_MISSING: login cloud diperlukan");return;
+        }
+        final int generation=++preflightGeneration;
+        if(launchAfter)stopPlayerQuietly();
+        preflightState="RUNNING";preflightDetail="";
+        event("AUTH_PREFLIGHT_START: authenticated read-only device list and device info; no binding changes");
+        authorizationExecutor.execute(()->{
+            final P2PAuthorizationProbe.Result outcome=P2PAuthorizationProbe.check(deviceId);
+            runOnUiThread(()->{
+                if(isFinishing()||generation!=preflightGeneration)return;
+                preflightState=outcome.state;
+                preflightDetail=outcome.detail;
+                event("AUTH_PREFLIGHT_RESULT: "+outcome.state+"; "+outcome.detail);
+                if(launchAfter){
+                    event("AUTH_NOTE: preflight does NOT prove streaming entitlement; server-side relation is authoritative");
+                    startP2P();
+                }
+            });
+        });
     }
     private void startP2P(){
         if(deviceId.isEmpty()||!deviceId.matches("[A-Za-z0-9_-]{1,100}")){
@@ -160,7 +198,7 @@ public final class NativeP2PActivity extends Activity {
             synchronized(eventLog){eventLog.setLength(0);}
             errorCode=-1;prepared=false;registerCallReturned=false;playSeen=false;
             sessionStartElapsed=SystemClock.elapsedRealtime();registerReturnedElapsed=0L;preparedElapsed=0L;playElapsed=0L;
-            networkAtStart=networkSnapshot();
+            networkAtStart=networkSnapshot();mediaVerified=false;
             event("START: SDK initialized at Application startup; "+PbsGwellApplication.getInitStatus()+"; network="+networkAtStart);
             long accessId=Long.parseLong(P2PSession.id());
             IoTVideoSdk.register(accessId,P2PSession.token());
@@ -168,7 +206,8 @@ public final class NativeP2PActivity extends Activity {
             event("REGISTER_CALL_RETURNED: register() is void; this does NOT prove server authentication; elapsed="+elapsed(registerReturnedElapsed));
 
             player=new LivePlayer();
-            player.setDataResource(deviceId,CallTypeEnum.VIDEO_DEFINITION_HD,(short)0);
+            player.setDataResource(deviceId,
+                    "SD".equals(selectedDefinition)?CallTypeEnum.VIDEO_DEFINITION_SD:CallTypeEnum.VIDEO_DEFINITION_HD,(short)0);
             player.setPreparedListener(new IPreparedListener(){
                 @Override public void onPrepared(){
                     prepared=true;preparedElapsed=SystemClock.elapsedRealtime();event("PREPARED: SDK reports player prepared; waiting for stream/frame; elapsed="+elapsed(preparedElapsed));
@@ -184,14 +223,34 @@ public final class NativeP2PActivity extends Activity {
             player.setErrorListener(new IErrorListener(){
                 @Override public void onError(int error){
                     errorCode=error;event("SDK_ERROR: code="+error+"; "+playerMetrics());
+                    if(error==8003){
+                        event("ERROR_8003_HINT: GWTimes IoTVideo ASrv maps 8003 to INVALID_DEVICE_USER_RELATIONSHIP. Android server-origin mapping unverified. Check PBS account binding/share, customer/product namespace, and IoTVideo backend; this is NOT a decoder diagnosis.");
+                    }
                 }
             });
             player.setVideoView(videoView);
-            event("PLAY_REQUEST: Device ID="+maskedDeviceId()+"; definition=HD; sourceId=0; network="+networkSnapshot());
+            event("PLAY_REQUEST: Device ID="+maskedDeviceId()+"; definition="+selectedDefinition+"; sourceId=0; preflight="+preflightState+"; network="+networkSnapshot());
             player.play();
+            mediaObserver=new Runnable(){
+                @Override public void run(){
+                    if(player==null || mediaVerified)return;
+                    try{
+                        int width=player.getVideoWidth(),height=player.getVideoHeight();
+                        int bps=player.getAvBytesPerSec();
+                        if(playSeen && width>0 && height>0 && bps>0){
+                            mediaVerified=true;
+                            event("MEDIA_VERIFIED: STATE_PLAY + dimensions="+width+"x"+height+
+                                " + avBytesPerSec="+bps+"; elapsed="+elapsed(SystemClock.elapsedRealtime()));
+                            return;
+                        }
+                    }catch(Throwable t){event("MEDIA_OBSERVER_ERROR: "+t.getClass().getSimpleName());return;}
+                    handler.postDelayed(this,2000);
+                }
+            };
+            handler.postDelayed(mediaObserver,2000);
             watchdog=()->{
-                if(player!=null&&!playSeen){
-                    event("WATCHDOG_25S: no STATE_PLAY; auth=NOT_CONFIRMED_BY_VOID_REGISTER; prepared="+prepared+
+                if(player!=null&&!mediaVerified){
+                    event("WATCHDOG_25S: no confirmed live frames; STATE_PLAY="+playSeen+"; auth=NOT_CONFIRMED_BY_VOID_REGISTER; preflight="+preflightState+"; prepared="+prepared+
                             "; registerCallReturned="+registerCallReturned+"; registerElapsed="+elapsed(registerReturnedElapsed)+
                             "; preparedElapsed="+elapsed(preparedElapsed)+"; network="+networkSnapshot()+"; "+playerMetrics());
                 }
@@ -202,13 +261,11 @@ public final class NativeP2PActivity extends Activity {
         }
     }
     private String safeMessage(Throwable t){
-        String m=t.getMessage();
-        if(m==null)return "(no detail)";
-        if(m.length()>140)m=m.substring(0,140);
-        if(m.toLowerCase(Locale.ROOT).contains("token")||m.contains("accessId"))return "(detail disamarkan untuk keamanan)";
-        return m;
+        // Third-party exception messages can contain IDs, URLs, or secrets.
+        return "(vendor error message redacted)";
     }
     private void stopPlayerQuietly(){
+        if(mediaObserver!=null){handler.removeCallbacks(mediaObserver);mediaObserver=null;}
         if(watchdog!=null){handler.removeCallbacks(watchdog);watchdog=null;}
         if(player!=null){
             try{player.stop();}catch(Throwable ignored){}
@@ -217,6 +274,7 @@ public final class NativeP2PActivity extends Activity {
         }
     }
     private void stopP2P(){
+        ++preflightGeneration;
         stopPlayerQuietly();
         event("USER_STOP: pemutaran dihentikan oleh pengguna.");
     }
@@ -229,6 +287,9 @@ public final class NativeP2PActivity extends Activity {
                 "\nprepared: "+prepared+
                 "\nregisterCallReturned: "+registerCallReturned+
                 "\nplaySeen: "+playSeen+
+                "\nmediaVerified: "+mediaVerified+
+                "\npreflightState: "+preflightState+
+                "\npreflightDetail: "+preflightDetail+
                 "\nerrorCode: "+errorCode+
                 "\nnetworkAtStart: "+networkAtStart+
                 "\nregisterElapsed: "+elapsed(registerReturnedElapsed)+
@@ -250,11 +311,13 @@ public final class NativeP2PActivity extends Activity {
         super.onPause();
     }
     @Override protected void onStop(){
+        ++preflightGeneration;
         stopPlayerQuietly();
         super.onStop();
     }
     @Override protected void onDestroy(){
         stopPlayerQuietly();
+        authorizationExecutor.shutdownNow();
         super.onDestroy();
     }
 }
