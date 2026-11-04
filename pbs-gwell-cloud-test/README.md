@@ -1,33 +1,37 @@
-# PBS Native P2P v1.2.2 — cumulative Cloud Access Readiness build
+# PBS Yoosee API Capability Test v1.0.0 / Native P2P v1.2.3
 
-Cumulative update based on the v1.2.1 diagnostic build. Package: `com.pbsgroup.gwellcloudtest.p2pnative122`; versionCode: 1; versionName: `1.2.2`. This package installs side-by-side with v1.2.1, so neither earlier diagnostic app needs to be uninstalled.
+Cumulative Android diagnostic build based on PBS Native P2P v1.2.2. Package: `com.pbsgroup.gwellcloudtest.p2pnative123`; versionCode: 1; versionName: `1.2.3`. It installs side-by-side with v1.2.2 and earlier test apps.
 
-## Included
-- Retains existing Yoosee account login and Device List flow.
-- Retains Native IoTVideo P2P test screen and its diagnostic callbacks.
-- Adds a Cloud Recording / AI Event readiness screen.
-- Adds a copyable vendor access request for Gwell.
-- Clearly reports that Cloud VAS is not enabled until Gwell confirms the AppID's VAS entitlement, product/package binding, and supported third-party authentication/signature method.
-- No Frida, no borrowed hard-coded credentials, no token extraction from another application, and no fabricated playback URL.
+## New API Capability Test
+The new screen runs read-only diagnostics using the currently logged-in account session:
+- Confirms session/AppID/AppToken presence without revealing their values.
+- Calls the existing authenticated Device List endpoint and reports HTTP/API code, latency and device count.
+- Calls the existing authenticated Device Info endpoint for a selected Device ID (or first listed device) and reports only status/field names, not raw device metadata.
+- Sends HTTPS HEAD probes to the OpenAPI base and Cloud Playback AI Event/Playback routes. These probes establish only TLS/HTTP reachability; they do not prove API authentication or entitlement.
+- Explicitly marks AI Event and Cloud Playback authorization as NOT_TESTED until Gwell provides a supported third-party signing method and confirms VAS entitlement.
+- Copies a redacted JSON report. It excludes passwords, AppID/AppToken values, AccessId/AccessToken, signatures, raw response bodies, playback URLs, and full Device ID.
 
-## Important scope limitation
-This build does **not** claim Cloud AI Event, Cloud Playback, HLS, or MP4 download is operational. The user currently has only AppID and AppToken. The public `camera-hack` scripts use a hard-coded sample Access ID/token and a Frida signing oracle attached to another running application. Those sample credentials are not PBS credentials and must not be reused. The official GWTimes demo's VAS integration also initializes its AccountMgr/product environment separately. AppID/AppToken alone do not establish that PBS has the required VAS entitlement or an officially supported signing interface.
+## Why AI Event / Playback are not sent yet
+The public `camera-hack` scripts call the v2 Cloudlinks APIs using a Frida signing oracle attached to a running Yoosee app. The sample values in that script are not PBS credentials. This build does not extract credentials from another app, reuse sample secrets, or send unsigned VAS requests. AppID/AppToken alone do not establish VAS entitlement or provide a supported signing interface.
 
-Once Gwell confirms access and supplies the supported integration specification, the VAS implementation can be added in a later cumulative release without changing the existing Native P2P path.
+The VAS routes remain explicitly marked NOT_TESTED. Ask Gwell for:
+1. Confirmation that PBS AppID has VAS AI Event and Cloud Playback permission.
+2. Supported third-party signing/authentication specification for `/openapi/vpaasPlayback/vas/aievent/list` and `/openapi/vpaasPlayback/vas/playback/play`.
+3. Required product/package binding, request headers/body, pagination, rate limits and HLS URL lifetime.
+
+## Run
+1. Keep v1.2.2 installed; v1.2.3 is a separate package.
+2. Install `PBS_Gwell_API_Capability_Test_v1.2.3.apk`.
+3. Login using the account and AppID/AppToken authorized for PBS.
+4. Select a Device ID or leave it blank to use the first listed camera.
+5. Open **API Capability Test** and tap **Jalankan API Capability Test**.
+6. Tap **Salin laporan JSON (redacted)** and share the report for analysis.
+
+The test does not modify device settings, bind/unbind devices, control PTZ, request HLS playback, or download recordings.
 
 ## Build
-GitHub Actions workflow: `.github/workflows/pbs-gwell-cloud-recording-v1.2.2.yml`.
-The workflow downloads the upstream `iotvideo-release.aar`, builds the debug APK, publishes it under `releases/`, and generates a SHA-256 checksum.
+GitHub Actions workflow: `.github/workflows/pbs-gwell-api-capability-v1.2.3.yml`.
+The workflow downloads the upstream GWTimes IoTVideo AAR, builds the APK, uploads an Actions artifact, and publishes the direct APK plus SHA-256 checksum.
 
-## Install and test
-1. Keep v1.2.1 installed.
-2. Install `PBS_Gwell_Native_P2P_v1.2.2.apk` as a separate app.
-3. Log in with the user's own account and authorized AppID/AppToken.
-4. Confirm Device List still loads.
-5. Run Native P2P Live and capture the on-screen safe diagnostic report.
-6. Open `Cloud Recording / AI Event` to see the exact VAS access status and copy the vendor request.
-
-A successful SDK initialization or a void `register()` return is not proof of successful P2P authentication. A real stream requires the SDK PLAY state and visible video frames.
-
-## SDK licensing
-The upstream IoTVideo AAR is a third-party SDK. This is an experimental compatibility build. Obtain written redistribution/commercial-use permission and the current supported SDK package from the rights holder before production deployment.
+## Licensing
+The upstream IoTVideo AAR is a third-party SDK. This experimental compatibility build is for controlled testing. Obtain written redistribution/commercial-use permission and the current supported SDK package from the rights holder before production deployment.
