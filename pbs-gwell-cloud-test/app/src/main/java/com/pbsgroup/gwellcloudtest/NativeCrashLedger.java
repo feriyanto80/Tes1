@@ -39,8 +39,8 @@ public final class NativeCrashLedger {
     public static void receiverCompatApplied(Context ctx,String source){
         // Source is an internal constant (Activity / Application), never user data.
         String safeSource="Activity".equals(source)?"Activity":"Application";
-        write(ctx,RECEIVER_FILE,"DYNAMIC_RECEIVER_NOT_EXPORTED_RETRY_APPLIED=true\\n"+
-            "context="+safeSource+"\\n"+
+        write(ctx,RECEIVER_FILE,"DYNAMIC_RECEIVER_NOT_EXPORTED_RETRY_APPLIED=true\n"+
+            "context="+safeSource+"\n"+
             "at="+System.currentTimeMillis());
     }
 
@@ -76,7 +76,7 @@ public final class NativeCrashLedger {
             "androidApi="+Build.VERSION.SDK_INT+"\n"+
             "supportedAbis="+abiSummary()+"\n"+
             "state="+(state.isEmpty()?"NO_NATIVE_START_RECORDED":state)+"\n"+
-            "receiverCompat="+(compat.isEmpty()?"NOT_APPLIED":compat)+"\\n"+
+            "receiverCompat="+(compat.isEmpty()?"NOT_APPLIED":compat)+"\n"+
             "javaCrash="+(crash.isEmpty()?"NOT_RECORDED (native SIGSEGV/abort requires adb logcat)":crash)+
             "\nCredentials, SDK tokens, passwords and full device IDs excluded.";
     }
