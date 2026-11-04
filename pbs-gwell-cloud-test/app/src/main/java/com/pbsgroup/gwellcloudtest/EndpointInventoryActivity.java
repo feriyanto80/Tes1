@@ -296,7 +296,7 @@ public final class EndpointInventoryActivity extends Activity {
             JSONObject report=new JSONObject();
             try{
                 report.put("application","PBS Yoosee Endpoint Inventory Scanner");
-                report.put("version","1.2.9");
+                report.put("version","1.3.0");
                 report.put("generatedAtUtc",utcNow());
                 report.put("testMode","READ_ONLY_OPTIONS_AND_HEAD");
                 report.put("credentialsIncluded",false);
@@ -415,7 +415,7 @@ public final class EndpointInventoryActivity extends Activity {
             c.setRequestMethod(method);
             c.setConnectTimeout(3500);c.setReadTimeout(3500);
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent","PBS-Gwell-Endpoint-Inventory/1.2.9");
+            c.setRequestProperty("User-Agent","PBS-Gwell-Endpoint-Inventory/1.3.0");
             c.setRequestProperty("Accept","application/json");
             int http=c.getResponseCode();
             String allow=safeHeader(c.getHeaderField("Allow"));
