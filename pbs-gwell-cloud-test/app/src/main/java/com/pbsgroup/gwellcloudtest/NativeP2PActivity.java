@@ -14,6 +14,7 @@ import android.net.NetworkCapabilities;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -60,6 +61,9 @@ public final class NativeP2PActivity extends Activity {
     private Runnable mediaObserver;
     private String selectedDefinition="HD";
     private volatile String dualBackendReport="NOT_TESTED";
+    private volatile String guestCompatReport="NOT_TESTED";
+    private volatile String preflightRelationCode="UNKNOWN";
+    private CheckBox confirmedSameAccountAndGuestLive;
 
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
     private TextView label(String txt,int sp,int color,boolean bold){
@@ -133,34 +137,75 @@ public final class NativeP2PActivity extends Activity {
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(bg);
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(14),dp(20),dp(14),dp(30));sc.addView(body);setContentView(sc);
-        body.addView(label("PBS · YOOSEE DUAL BACKEND v1.2.8",14,accent,true));
-        body.addView(label("P2P Dual Backend Diagnostic",23,white,true));
+        body.addView(label("PBS · YOOSEE GUEST P2P v1.2.9",14,accent,true));
+        body.addView(label("Guest Auth & Backend Compatibility",23,white,true));
         body.addView(label("Device ID: "+deviceId,14,muted,false));
-        body.addView(label("IoTVideo: live HD/SD melalui SDK GWTimes. GWell Legacy: deteksi keluarga perangkat, kesiapan SDK dan DNS (READ-ONLY). Streaming Legacy membutuhkan SDK dan sesi resmi vendor yang belum tersedia dalam paket ini.",12,muted,false));
+        body.addView(label("Akun guest dapat memiliki akses live yang sah. Pemeriksaan ini membedakan izin berbagi Yoosee, sesi Cloudlinks, identitas app PBS, dan penolakan SDK IoTVideo. Jalur GWell Legacy tetap read-only tanpa SDK resmi.",12,muted,false));
         LinearLayout frame=new LinearLayout(this);frame.setBackgroundColor(Color.BLACK);
         LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,dp(270));vp.topMargin=dp(12);body.addView(frame,vp);
         videoView=(IoTVideoView)getLayoutInflater().inflate(R.layout.pbs_native_p2p_view,frame,false);
         frame.addView(videoView,new LinearLayout.LayoutParams(-1,-1));
         status=label("SDK: "+PbsGwellApplication.getInitStatus()+"\nBelum memulai sesi P2P.",13,white,false);
         status.setTextIsSelectable(true);body.addView(status);
+        confirmedSameAccountAndGuestLive=new CheckBox(this);
+        confirmedSameAccountAndGuestLive.setText(
+            "Saya sudah menguji: akun Yoosee resmi dan PBS sama, kamera shared/guest, dan live berhasil di Yoosee");
+        confirmedSameAccountAndGuestLive.setTextColor(white);
+        confirmedSameAccountAndGuestLive.setTextSize(13);
+        confirmedSameAccountAndGuestLive.setChecked(false);
+        body.addView(confirmedSameAccountAndGuestLive);
+        Button guestCompat=button("🔐 Uji Guest Auth & Backend Compatibility",surface);
         Button dualBackend=button("🔬 Diagnostik Dual Backend (IoTVideo / GWell)",surface);
         Button preflight=button("🔎 Cek relasi akun–kamera (read-only)",surface);
         Button play=button("▶ Diagnostik Live P2P HD",Color.rgb(27,142,120));
         Button playSd=button("▶ Diagnostik Live P2P SD",Color.rgb(27,142,120));
         Button stop=button("■ Hentikan P2P",surface);
         Button share=button("Salin Hasil Uji (Tanpa Token)",surface);
-        for(Button x:new Button[]{dualBackend,preflight,play,playSd,stop,share}){
+        for(Button x:new Button[]{guestCompat,dualBackend,preflight,play,playSd,stop,share}){
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(47));lp.topMargin=dp(9);body.addView(x,lp);
         }
+        guestCompat.setOnClickListener(v->runGuestCompatibilityDiagnostic());
         dualBackend.setOnClickListener(v->runDualBackendDiagnostic());
         preflight.setOnClickListener(v->runAuthorizationPreflight(false));
         play.setOnClickListener(v->{selectedDefinition="HD";runAuthorizationPreflight(true);});
         playSd.setOnClickListener(v->{selectedDefinition="SD";runAuthorizationPreflight(true);});
         stop.setOnClickListener(v->stopP2P());
         share.setOnClickListener(v->copyReport());
-        body.addView(label("v1.2.8 · Diagnostik Dual Backend membandingkan metadata perangkat, ketersediaan runtime GWell, dan DNS host. Device ID 8 digit hanya petunjuk, bukan bukti backend. Kode 8003 adalah relasi tidak sah dalam tabel GWTimes ASrv; mapping SDK Android belum dipastikan. Tidak melakukan bind/unbind.",12,muted,false));
+        body.addView(label("v1.2.9 · Relasi guest (2) adalah indikasi akses berbagi, bukan otomatis tidak sah. Jika Yoosee resmi berhasil live menggunakan akun sama tetapi PBS error 8003, periksa perbedaan sesi SDK, identitas aplikasi, dan backend. Pemeriksaan tidak mengambil token aplikasi Yoosee atau mengubah sharing.",12,muted,false));
         if(!P2PSession.ready())event("SESSION_MISSING: Login cloud dahulu, lalu pilih Device ID kembali.");
     }
+    private void runGuestCompatibilityDiagnostic(){
+        if(deviceId.isEmpty()||!deviceId.matches("[A-Za-z0-9_-]{1,100}")){
+            event("DEVICE_ID_INVALID");return;
+        }
+        if(!P2PSession.ready()){
+            event("SESSION_MISSING: login ke akun PBS dahulu");return;
+        }
+        final boolean userConfirmed=confirmedSameAccountAndGuestLive!=null &&
+                confirmedSameAccountAndGuestLive.isChecked();
+        final int generation=++preflightGeneration;
+        event("GUEST_AUTH_CHECK_START: cloud relationship + session format + SDK API inspection; userConfirmed="+userConfirmed);
+        authorizationExecutor.execute(()->{
+            final P2PAuthorizationProbe.Result cloud=P2PAuthorizationProbe.check(deviceId);
+            final GuestP2PCompatibilityDiagnostic.Result check=
+                GuestP2PCompatibilityDiagnostic.inspect(getApplicationContext(),cloud,userConfirmed);
+            final DualBackendDiagnostic.Result family=
+                DualBackendDiagnostic.run(getApplicationContext(),deviceId,cloud);
+            runOnUiThread(()->{
+                if(isFinishing()||generation!=preflightGeneration)return;
+                preflightState=cloud.state;
+                preflightDetail=cloud.detail;
+                preflightRelationCode=cloud.relationCode;
+                guestCompatReport=check.report();
+                dualBackendReport=family.report();
+                event("AUTH_PREFLIGHT_RESULT: "+cloud.state+"; "+cloud.detail);
+                event(guestCompatReport);
+                event(dualBackendReport);
+                event("GUEST_AUTH_BOUNDARY: official guest live confirmed by user is NOT transferable automatically to the PBS IoTVideo SDK; native vendor auth and product entitlement are unverified.");
+            });
+        });
+    }
+
     private void runDualBackendDiagnostic(){
         if(deviceId.isEmpty()||!deviceId.matches("[A-Za-z0-9_-]{1,100}")){
             event("DEVICE_ID_INVALID");return;
@@ -178,6 +223,7 @@ public final class NativeP2PActivity extends Activity {
             runOnUiThread(()->{
                 if(isFinishing()||generation!=preflightGeneration)return;
                 preflightState=cloud.state;preflightDetail=cloud.detail;
+                preflightRelationCode=cloud.relationCode;
                 event("AUTH_PREFLIGHT_RESULT: "+cloud.state+"; "+cloud.detail);
                 dualBackendReport=diagnostic.report();
                 event(dualBackendReport);
@@ -203,6 +249,7 @@ public final class NativeP2PActivity extends Activity {
                 if(isFinishing()||generation!=preflightGeneration)return;
                 preflightState=outcome.state;
                 preflightDetail=outcome.detail;
+                preflightRelationCode=outcome.relationCode;
                 event("AUTH_PREFLIGHT_RESULT: "+outcome.state+"; "+outcome.detail);
                 if(launchAfter){
                     event("AUTH_NOTE: preflight does NOT prove streaming entitlement; server-side relation is authoritative");
@@ -251,7 +298,11 @@ public final class NativeP2PActivity extends Activity {
                 @Override public void onError(int error){
                     errorCode=error;event("SDK_ERROR: code="+error+"; "+playerMetrics());
                     if(error==8003){
-                        event("ERROR_8003_HINT: GWTimes IoTVideo ASrv maps 8003 to INVALID_DEVICE_USER_RELATIONSHIP. Android server-origin mapping unverified. Check PBS account binding/share, customer/product namespace, and IoTVideo backend; this is NOT a decoder diagnosis.");
+                        event("ERROR_8003_HINT: published GWTimes ASrv uses 8003 for invalid relationship; actual Android code origin unverified. Guest sharing is NOT automatically invalid.");
+                        if("2".equals(preflightRelationCode) && confirmedSameAccountAndGuestLive!=null &&
+                                confirmedSameAccountAndGuestLive.isChecked()){
+                            event("GUEST_ACCESS_DIFFERENTIAL: user confirms same account streams via official Yoosee while PBS IoTVideo 8003. Check app/product namespace, SDK token scope and backend before considering permissions; do not unbind.");
+                        }
                     }
                 }
             });
@@ -308,7 +359,7 @@ public final class NativeP2PActivity extends Activity {
     private void copyReport(){
         String events;
         synchronized(eventLog){events=eventLog.toString();}
-        String report="PBS Native Dual Backend P2P diagnostic · build 1.2.8"+
+        String report="PBS Yoosee Guest P2P Authentication & Backend Compatibility diagnostic · build 1.2.9"+
                 "\nDevice ID: "+maskedDeviceId()+
                 "\nSDK init: "+PbsGwellApplication.getInitStatus()+
                 "\nprepared: "+prepared+
@@ -317,6 +368,9 @@ public final class NativeP2PActivity extends Activity {
                 "\nmediaVerified: "+mediaVerified+
                 "\npreflightState: "+preflightState+
                 "\npreflightDetail: "+preflightDetail+
+                "\npreflightRelationCode: "+preflightRelationCode+
+                "\nuserConfirmedOfficialGuestLiveSameAccount: "+(confirmedSameAccountAndGuestLive!=null && confirmedSameAccountAndGuestLive.isChecked())+
+                "\nguestSessionCompatibility: "+guestCompatReport+
                 "\ndualBackendAssessment: "+dualBackendReport+
                 "\nerrorCode: "+errorCode+
                 "\nnetworkAtStart: "+networkAtStart+
