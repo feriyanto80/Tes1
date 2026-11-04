@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <queries><package android:name="com.yoosee" /></queries>
     <application tools:replace="android:label" android:name=".PbsGwellApplication" android:allowBackup="false" android:usesCleartextTraffic="true"
-        android:label="PBS Yoosee Native GWell Crash Guard 1.3.2"
+        android:label="PBS Yoosee Native GWell Crash Guard 1.3.3"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".CloudAccessActivity" android:exported="false" />
         <activity android:name=".ApiCapabilityActivity" android:exported="false" />
