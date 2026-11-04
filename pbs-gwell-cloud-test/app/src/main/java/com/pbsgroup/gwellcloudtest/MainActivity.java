@@ -50,7 +50,7 @@ public final class MainActivity extends Activity {
         });
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
         root.addView(label("PBS Yoosee Dual Backend v1.2.8",27,text,true));
-        root.addView(label("Login akun, daftar kamera, API Capability Test, Native P2P diagnostics, dan RTSP/ONVIF alternative.",13,secondary,false));
+        root.addView(label("Login akun, daftar kamera, Dual Backend Diagnostic (IoTVideo + GWell Legacy), dan RTSP/ONVIF alternatif.",13,secondary,false));
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
         appToken=input(root,"AppToken yang sah (tidak disimpan)","",true);
@@ -70,7 +70,7 @@ public final class MainActivity extends Activity {
         Button detail=button(root,"Lihat informasi Device ID",false);
         Button liveBtn=button(root,"▶ Buka LIVE VIDEO + PTZ",true);
         liveBtn.setOnClickListener(v->openCameraViewer(deviceId.getText().toString().trim()));
-        Button p2pBtn=button(root,"▶ Native Live P2P (tanpa IP)",true);
+        Button p2pBtn=button(root,"🔬 Dual Backend P2P Diagnostic",true);
         p2pBtn.setOnClickListener(v->openNativeP2P(deviceId.getText().toString().trim()));
         Button cloudBtn=button(root,"☁ Cloud Recording / AI Event · cek akses",false);
         cloudBtn.setOnClickListener(v->startActivity(new Intent(this,CloudAccessActivity.class)));
@@ -86,7 +86,7 @@ public final class MainActivity extends Activity {
         box.addView(status);root.addView(box);
         Button share=button(root,"Bagikan laporan tanpa kredensial",false);
         root.addView(label("Keamanan: TLS certificate verification aktif. Tidak ada pencarian kombinasi password, impor daftar akun, penyimpanan token permanen, atau kirim data ke server PBS.",11,secondary,false));
-        root.addView(label("Live P2P Native memakai SDK GWTimes IoTVideo secara eksperimental lewat Device ID, tanpa IP/RTSP. Status keberhasilan hanya berdasarkan callback SDK dan gambar. RTSP+ONVIF masih tersedia sebagai alternatif.",11,secondary,false));
+        root.addView(label("Live P2P IoTVideo masih dapat diuji melalui SDK GWTimes. Jalur GWell Legacy saat ini diagnostik metadata/DNS/runtime saja, belum live video tanpa SDK resmi. RTSP+ONVIF tetap tersedia sebagai alternatif.",11,secondary,false));
         login.setOnClickListener(v->runLogin());
         list.setOnClickListener(v->execute("DEVICE_LIST",()->{
             ensureSession();
