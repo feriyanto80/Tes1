@@ -1,6 +1,7 @@
 package com.pbsgroup.gwellcloudtest;
 
 import android.app.Application;
+import android.os.Build;
 import android.util.Log;
 import com.tencentcs.iotvideo.IoTVideoSdk;
 import com.tencentcs.iotvideo.utils.UrlHelper;
@@ -15,6 +16,19 @@ public final class PbsGwellApplication extends Application {
 
     @Override public void onCreate() {
         super.onCreate();
+        final String proc=Build.VERSION.SDK_INT>=28 ? Application.getProcessName() : "";
+        final boolean nativeProcess=proc!=null && proc.endsWith(":gwell");
+        final Thread.UncaughtExceptionHandler previous=Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread,error)->{
+            try{NativeCrashLedger.fatal(this,error,nativeProcess);}catch(Throwable ignored){}
+            if(previous!=null)previous.uncaughtException(thread,error);
+            else android.os.Process.killProcess(android.os.Process.myPid());
+        });
+        // IoTVideo init is unrelated to GWell and must not run inside isolated GWell process.
+        if(nativeProcess){
+            initStatus="GWELL_ISOLATED; IOTVIDEO_INIT_SKIPPED";
+            return;
+        }
         try {
             // The upstream IoTVideo demo selects the release environment by default.
             UrlHelper.getInstance().setServerType(UrlHelper.SERVER_RELEASE);
