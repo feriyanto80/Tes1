@@ -37,6 +37,21 @@ jobs:
           unzip -t pbs-gwell-cloud-test/app/libs/iotvideo-release.aar | tail -n 2
       - name: Build Android API Capability Scanner APK
         run: gradle -p pbs-gwell-cloud-test :app:assembleDebug --no-daemon --stacktrace
+      - name: Package cumulative Android source
+        run: |
+          zip -q -r PBS_Yoosee_API_Capability_Scanner_v1.2.7_SOURCE.zip \
+            pbs-gwell-cloud-test .github/workflows/pbs-gwell-api-capability-v1.2.7.yml \
+            -x 'pbs-gwell-cloud-test/app/build/*' \
+               'pbs-gwell-cloud-test/releases/*' \
+               'pbs-gwell-cloud-test/app/libs/*' \
+               'pbs-gwell-cloud-test/.gradle/*'
+          unzip -t PBS_Yoosee_API_Capability_Scanner_v1.2.7_SOURCE.zip | tail -n 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PBS_Yoosee_API_Capability_Scanner_v1.2.7_SOURCE
+          path: PBS_Yoosee_API_Capability_Scanner_v1.2.7_SOURCE.zip
+          retention-days: 14
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: PBS_Gwell_API_Capability_Scanner_v1.2.7
@@ -47,8 +62,10 @@ jobs:
         run: |
           mkdir -p pbs-gwell-cloud-test/releases
           cp pbs-gwell-cloud-test/app/build/outputs/apk/debug/app-debug.apk pbs-gwell-cloud-test/releases/PBS_Gwell_API_Capability_Scanner_v1.2.7.apk
+          cp PBS_Yoosee_API_Capability_Scanner_v1.2.7_SOURCE.zip pbs-gwell-cloud-test/releases/
           cd pbs-gwell-cloud-test/releases
           sha256sum PBS_Gwell_API_Capability_Scanner_v1.2.7.apk > PBS_Gwell_API_Capability_Scanner_v1.2.7.apk.sha256
+          sha256sum PBS_Yoosee_API_Capability_Scanner_v1.2.7_SOURCE.zip > PBS_Yoosee_API_Capability_Scanner_v1.2.7_SOURCE.zip.sha256
           cd ../../
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
