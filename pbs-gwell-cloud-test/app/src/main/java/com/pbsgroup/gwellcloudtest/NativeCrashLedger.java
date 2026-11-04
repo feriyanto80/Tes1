@@ -14,28 +14,38 @@ import java.nio.charset.StandardCharsets;
 public final class NativeCrashLedger {
     private static final String STATE_FILE="pbs_gwell_native_state.txt";
     private static final String CRASH_FILE="pbs_gwell_native_crash.txt";
+    private static final String RECEIVER_FILE="pbs_gwell_receiver_compat.txt";
     private NativeCrashLedger() {}
 
     public static void launching(Context ctx) {
-        write(ctx,STATE_FILE,"STATE=NATIVE_START_REQUESTED\nBuild=1.3.2\nAt="+System.currentTimeMillis());
+        write(ctx,STATE_FILE,"STATE=NATIVE_START_REQUESTED\nBuild=1.3.3\nAt="+System.currentTimeMillis());
         // A new test must not be confused with a previous Java exception.
         try {new File(ctx.getFilesDir(),CRASH_FILE).delete();}catch(Exception ignored){}
+        try {new File(ctx.getFilesDir(),RECEIVER_FILE).delete();}catch(Exception ignored){}
     }
 
     public static void opened(Context ctx) {
-        write(ctx,STATE_FILE,"STATE=NATIVE_ACTIVITY_ONCREATE_OK\nBuild=1.3.2\nAt="+System.currentTimeMillis());
+        write(ctx,STATE_FILE,"STATE=NATIVE_ACTIVITY_ONCREATE_OK\nBuild=1.3.3\nAt="+System.currentTimeMillis());
     }
 
     public static void uiReady(Context ctx) {
-        write(ctx,STATE_FILE,"STATE=NATIVE_UI_READY\nBuild=1.3.2\nAt="+System.currentTimeMillis());
+        write(ctx,STATE_FILE,"STATE=NATIVE_UI_READY\nBuild=1.3.3\nAt="+System.currentTimeMillis());
     }
 
     public static void exited(Context ctx) {
-        write(ctx,STATE_FILE,"STATE=NATIVE_EXITED\nBuild=1.3.2\nAt="+System.currentTimeMillis());
+        write(ctx,STATE_FILE,"STATE=NATIVE_EXITED\nBuild=1.3.3\nAt="+System.currentTimeMillis());
+    }
+
+    public static void receiverCompatApplied(Context ctx,String source){
+        // Source is an internal constant (Activity / Application), never user data.
+        String safeSource="Activity".equals(source)?"Activity":"Application";
+        write(ctx,RECEIVER_FILE,"DYNAMIC_RECEIVER_NOT_EXPORTED_RETRY_APPLIED=true\\n"+
+            "context="+safeSource+"\\n"+
+            "at="+System.currentTimeMillis());
     }
 
     public static void fatal(Context ctx, Throwable failure, boolean nativeProcess) {
-        StringBuilder summary=new StringBuilder("PBS_Native_Crash_v1.3.2\n");
+        StringBuilder summary=new StringBuilder("PBS_Native_Crash_v1.3.3\n");
         summary.append("process=").append(nativeProcess?"GWELL_ISOLATED":"MAIN").append("\n");
         summary.append("utcEpochMillis=").append(System.currentTimeMillis()).append("\n");
         summary.append("androidApi=").append(Build.VERSION.SDK_INT).append("\n");
@@ -45,7 +55,7 @@ public final class NativeCrashLedger {
         while(cause!=null && depth++<3) {
             summary.append("cause").append(depth).append("=").append(cause.getClass().getName()).append("\n");
             StackTraceElement[] trace=cause.getStackTrace();
-            for(int i=0;i<Math.min(trace.length,9);i++) {
+            for(int i=0;i<Math.min(trace.length,32);i++) {
                 StackTraceElement element=trace[i];
                 // No exception messages, method arguments, account IDs, paths or tokens.
                 summary.append("at ").append(element.getClassName()).append(".")
@@ -55,16 +65,18 @@ public final class NativeCrashLedger {
             cause=cause.getCause();
         }
         write(ctx,CRASH_FILE,summary.toString());
-        write(ctx,STATE_FILE,"STATE=JAVA_FATAL_RECORDED\nBuild=1.3.2\nAt="+System.currentTimeMillis());
+        write(ctx,STATE_FILE,"STATE=JAVA_FATAL_RECORDED\nBuild=1.3.3\nAt="+System.currentTimeMillis());
     }
 
     public static String report(Context ctx) {
         String state=read(ctx,STATE_FILE);
         String crash=read(ctx,CRASH_FILE);
-        return "PBS Native Startup Guard v1.3.2\n"+
+        String compat=read(ctx,RECEIVER_FILE);
+        return "PBS Native Startup Guard v1.3.3\n"+
             "androidApi="+Build.VERSION.SDK_INT+"\n"+
             "supportedAbis="+abiSummary()+"\n"+
             "state="+(state.isEmpty()?"NO_NATIVE_START_RECORDED":state)+"\n"+
+            "receiverCompat="+(compat.isEmpty()?"NOT_APPLIED":compat)+"\\n"+
             "javaCrash="+(crash.isEmpty()?"NOT_RECORDED (native SIGSEGV/abort requires adb logcat)":crash)+
             "\nCredentials, SDK tokens, passwords and full device IDs excluded.";
     }
