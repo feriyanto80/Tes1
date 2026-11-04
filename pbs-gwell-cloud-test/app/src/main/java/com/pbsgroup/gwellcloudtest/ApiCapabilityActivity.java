@@ -124,7 +124,7 @@ public final class ApiCapabilityActivity extends Activity {
             String selectedId=requestedId;
             try{
                 report.put("application","PBS Yoosee API Capability Test");
-                report.put("version","1.3.3");
+                report.put("version","1.3.4");
                 report.put("generatedAtUtc",utcNow());
                 report.put("testMode","READ_ONLY");
                 report.put("credentialsIncluded",false);
@@ -346,7 +346,7 @@ public final class ApiCapabilityActivity extends Activity {
             c=(HttpsURLConnection)url.openConnection();
             c.setRequestMethod("HEAD");c.setConnectTimeout(8000);c.setReadTimeout(8000);
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent","PBS-Yoosee-Capability-Test/1.3.3");
+            c.setRequestProperty("User-Agent","PBS-Yoosee-Capability-Test/1.3.4");
             c.setRequestProperty("Accept","application/json");
             int http=c.getResponseCode();
             long elapsed=System.currentTimeMillis()-start;
