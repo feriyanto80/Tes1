@@ -1,6 +1,42 @@
-# PBS Yoosee v1.3.0 — Native GWell P2P-Core Integration
+# PBS Yoosee v1.3.1 — Native GWell Launcher & P2P-Core Integration
 
-Cumulative Android source based on PBS Yoosee v1.2.9. Built for diagnostic/research only.
+Cumulative Android source based on PBS Yoosee v1.3.0, retaining the v1.2.9 features. Built for diagnostic/research only.
+
+## v1.3.1 button not opening: root cause and resolution
+
+In v1.3.0 the button listener called `openGwellNative(deviceId.getText().toString())`.
+When no device had been selected, `openGwellNative()` simply wrote
+"Pilih Device ID kamera dahulu" to a status field at the very bottom of the
+main screen, then returned. The screen did not navigate and no toast appeared.
+This is a verified source-level UX defect. It may not explain separate
+device-side crashes when the old native Activity did launch.
+
+v1.3.1 corrects this by routing all GWell entry points through
+`GwellLauncherActivity`, a pure Android Activity that does NOT instantiate
+the legacy SDK until the user presses a separate button.
+
+- Initial GWell button now works whether the Device ID is filled or empty.
+- The launcher's Device ID field is prefilled with the selected camera when
+  provided. Otherwise enter the Device ID on the launcher.
+- Cards in the authenticated device list offer **GWell P2P-Core (pilih kamera)**.
+- Empty or invalid IDs display an immediate toast and inline status.
+- Explicit Activity registration is verified before launching the native
+  player; missing class, Java linkage error and synchronous launch exception
+  are separately reported without copying sensitive exception messages.
+- The Native GWell player remains the same v1.3.0 login/session monitor
+  implementation. Successful build is NOT proof that GWell server login,
+  guest rights, or streaming succeed.
+- Installation uses distinct application ID
+  `com.pbsgroup.gwellcloudtest.p2pnative131gwell` to avoid signing conflict
+  with previous GitHub Actions debug builds; the two apps coexist.
+- No change to camera owner/share, no credential capture from official Yoosee.
+
+**Test the launcher first**: click GWell Native P2P-Core LIVE from the main
+PBS screen with the Device ID field empty. The new launcher must open. Type
+`38819486`, then press **Buka GWell Native Player**. If the native page
+still crashes after launching, capture a sanitized Android crash stack
+and share only class/method/exception information, never tokens/passwords.
+
 
 ## What changed
 
@@ -22,7 +58,7 @@ Cumulative Android source based on PBS Yoosee v1.2.9. Built for diagnostic/resea
 - No session persistence: vendor account password, device monitor password,
   session IDs and verify codes are held only during the live process.
 - The native SDK requires a **vendor registered** AppID/AppToken and
-  **APPVersion** `XX.XX.XX.XX`; Android `versionName=1.3.0` is unrelated.
+  **APPVersion** `XX.XX.XX.XX`; Android `versionName=1.3.1` is unrelated.
   The SDK may also bind credentials to the registered package name.
 
 ## Camera 38819486: what is known
@@ -37,9 +73,10 @@ The GWell SDK is a different backend/session flow: Cloudlinks
 
 ## Test
 
-1. Install `PBS_Yoosee_Native_GWell_v1.3.0.apk` alongside v1.2.9.
-2. Select Device ID 38819486 in main PBS screen; choose **GWell Native
-   P2P-Core LIVE (eksperimental)**.
+1. Install `PBS_Yoosee_Native_GWell_v1.3.1.apk` alongside v1.2.9.
+2. Choose **GWell Native P2P-Core LIVE (eksperimental)** on the main screen.
+   The launcher opens even if the main-page Device ID was empty. Enter or
+   verify Device ID `38819486` and press **Buka GWell Native Player**.
 3. Enter **AppID**, **AppToken**, and **APPVersion** assigned by the GWell
    vendor for the actual PBS application and an authorized guest Yoosee
    account/password. The existing Cloudlinks AppID/AppToken can be
@@ -72,9 +109,9 @@ in the diagnostic debug APK. Validate redistribution/commercial licensing
 with the vendor before use in production. Android 16/runtime/firmware and
 server compatibility are **not guaranteed by a successful build**.
 
-Workflow: `.github/workflows/pbs-yoosee-native-gwell-v1.3.0.yml`.
-Android package: `com.pbsgroup.gwellcloudtest.p2pnative130gwell`.
-versionCode: 13000; versionName: 1.3.0.
+Workflow: `.github/workflows/pbs-yoosee-native-gwell-v1.3.1.yml`.
+Android package: `com.pbsgroup.gwellcloudtest.p2pnative131gwell`.
+versionCode: 13100; versionName: 1.3.1.
 
 ## Sources and references
 
