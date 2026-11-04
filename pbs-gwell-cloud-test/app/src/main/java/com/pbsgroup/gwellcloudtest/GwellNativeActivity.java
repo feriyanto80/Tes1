@@ -1,6 +1,10 @@
 package com.pbsgroup.gwellcloudtest;
 
 import android.content.ClipData;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ClipboardManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -109,6 +113,35 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
         if(deviceId.length()<5)return "[REDACTED]";
         return deviceId.substring(0,3)+"…"+deviceId.substring(deviceId.length()-2);
     }
+    // Legacy GWell AAR still calls pre-Android-14 registerReceiver overloads
+    // from its BaseMonitorActivity setup. Do not broadly suppress errors.
+    // Retry ONLY the platform's missing export-flag SecurityException.
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter){
+        try{
+            return super.registerReceiver(receiver,filter);
+        }catch(SecurityException missingFlag){
+            if(android.os.Build.VERSION.SDK_INT < 34 || receiver==null ||
+               !GwellReceiverCompat.isMissingExportFlag(missingFlag))throw missingFlag;
+            Intent result=super.registerReceiver(receiver,filter,Context.RECEIVER_NOT_EXPORTED);
+            NativeCrashLedger.receiverCompatApplied(this,"Activity");
+            return result;
+        }
+    }
+
+    @Override public Intent registerReceiver(BroadcastReceiver receiver,IntentFilter filter,
+                                             String permission,Handler scheduler){
+        try{
+            return super.registerReceiver(receiver,filter,permission,scheduler);
+        }catch(SecurityException missingFlag){
+            if(android.os.Build.VERSION.SDK_INT < 34 || receiver==null ||
+               !GwellReceiverCompat.isMissingExportFlag(missingFlag))throw missingFlag;
+            Intent result=super.registerReceiver(receiver,filter,permission,scheduler,
+                Context.RECEIVER_NOT_EXPORTED);
+            NativeCrashLedger.receiverCompatApplied(this,"Activity");
+            return result;
+        }
+    }
+
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
         NativeCrashLedger.opened(this);
@@ -128,7 +161,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
             root.setPadding(dp(16),bars.top+dp(20),dp(16),bars.bottom+dp(30));
             return insets;
         });
-        root.addView(label("PBS · GWell P2P-CORE v1.3.2",13,accent));
+        root.addView(label("PBS · GWell P2P-CORE v1.3.3",13,accent));
         root.addView(label("Native GWell Live · Vendor SDK",23,white));
         root.addView(label("Device ID: "+deviceId,14,muted));
         root.addView(label("SDK nyata dari jwkj/GwellDemo. Login native GWell memerlukan kredensial aplikasi dengan APPVersion yang didaftarkan vendor. Login Cloudlinks PBS tidak otomatis menyediakan SessionID1/2 dan P2PVerifyCode1/2.",12,muted));
@@ -155,7 +188,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
         button(root,"Salin laporan (tanpa kredensial)",false,this::copyReport);
         root.addView(label("PENTING: kode APPVersion bukan Android versionName. Identitas APPID/APPTOKEN, APPVersion, dan package name mungkin terikat pada vendor. Paket ini berisi SDK contoh arsip 2019; bukan bypass akses.",11,muted));
         root.addView(label("SDK mengembalikan status koneksi, versi P2P, vAccept/vConnectReady, dan video PTS. Koneksi sukses belum menjamin video muncul. Tidak melakukan bind/unbind, reset, atau mengambil token Yoosee resmi.",11,muted));
-        root.addView(label("Mode stabilisasi: mesin native berjalan di proses Android terpisah. Jika proses berhenti, kembali ke launcher untuk menyalin diagnostik. Kredensial Cloudlinks dari proses utama tidak otomatis tersedia di proses terpisah.",11,muted));
+        root.addView(label("Android 14+: registration broadcast internal SDK yang belum mencantumkan export flag dicoba ulang sebagai NOT_EXPORTED. Mesin native berjalan di proses Android terpisah. Jika proses berhenti, kembali ke launcher untuk menyalin diagnostik. Kredensial Cloudlinks dari proses utama tidak otomatis tersedia di proses terpisah.",11,muted));
         NativeCrashLedger.uiReady(this);
     }
 
@@ -368,7 +401,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
     private void copyReport(){
         String entries;
         synchronized(log){entries=log.toString();}
-        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.2"+
+        String report="PBS Yoosee Native GWell P2P-Core · build v1.3.3"+
             "\nDevice ID: "+maskedDevice()+
             "\nlegacySdk: jwkj/GwellDemo P2P-Core 0.5.4 (archived 2019)"+
             "\nappVersionProvided: "+(!get(appVersionInput).isEmpty())+
