@@ -1,56 +1,50 @@
-# PBS Yoosee / Gwell API Capability Test v1.2.5
+# PBS Yoosee / Gwell API Capability Scanner v1.2.6
 
-Android diagnostic build based on the PBS Gwell Native P2P test application. Package: `com.pbsgroup.gwellcloudtest.p2pnative125`; versionName: `1.2.5`. This package installs side-by-side with earlier diagnostic packages.
+Android diagnostic build based cumulatively on v1.2.5. Package: `com.pbsgroup.gwellcloudtest.p2pnative126`; versionCode: `126`; versionName: `1.2.6`. It installs side-by-side with v1.2.5 and earlier diagnostic packages.
 
-## v1.2.5 changes
+## v1.2.6 changes
 
-- Adds **Endpoint Inventory Scan** to the main screen.
-- Includes the legacy `.ashx`, OpenAPI, VAS, Cloud Playback, AI Event, Network Config, Advertising and Auth endpoint paths supplied for PBS.
-- Uses only HTTP `OPTIONS` and, for read-only candidates, `HEAD`.
-- Does not send passwords, AppID/AppToken, AccessToken, signatures, Device IDs, request bodies or playback URLs in the inventory scan.
-- Does not execute Login, Logout, Register, Password Reset/Modify, Bind/Unbind, Modify, Delete, Firmware Upgrade, SMS/Email, share, billing, token-generation, playback or secret-retrieval operations.
-- Legacy API host candidates are checked in order: `api1.cloudlinks.cn`, then `api2.cloudlinks.cn`.
-- OpenAPI paths are mapped to the observed OpenAPI host; vPAAS playback/AI Event paths to `saas-playback.cloudlinks.cn`.
-- VAS API paths use `vasapi.cloudlinks.cn:10443` as an **unconfirmed candidate host**. The three `/v2/auth` paths are catalogued but not probed because their base host is unknown.
+- Adds DNS resolution diagnostics for the known candidate hosts: `api1.cloudlinks.cn`, `api2.cloudlinks.cn`, `openapi-iot.cloudlinks.cn`, `saas-playback.cloudlinks.cn`, and `vasapi.cloudlinks.cn`.
+- Fixes the v1.2.5 inventory summary defect: endpoints whose candidate hosts fail DNS/network resolution are no longer silently counted as `other`; endpoint-level and individual-attempt counters are reported separately.
+- Separates DNS lookup failure, connection failure, TLS error, network timeout, HTTP response and scan timeout.
+- Keeps the complete endpoint catalog and read-only OPTIONS/HEAD behavior.
+- Authenticated API Capability Test now tries `device/getDeviceInfo` first, then `device/infoQuery` with the existing `devId` and `deviceId` fallback parameters if the first route is rejected.
+- Reports only the presence and shape of device-status fields. It does not reinterpret undocumented numeric vendor status enums as online/offline.
+- Adds a direct entry to the native IoTVideo Live P2P diagnostic screen from API Capability Test.
+- Updates application package/version metadata and GitHub Actions build workflow.
 
-## Important interpretation
+## Safety boundaries
 
-The Endpoint Inventory Scan is a **transport/route diagnostic**, not an authenticated API test:
-- HTTP 2xx means the server returned a successful response to OPTIONS/HEAD; it does not prove the business endpoint supports the intended GET/POST method.
-- HTTP 3xx means the server redirected the request.
-- HTTP 401/403 means the host/path responded with an access restriction.
-- HTTP 404 means that host returned a not-found response for the probe method; it may still be a method-specific route.
-- HTTP 405/501 means the probe method is unsupported; it does not prove the API path is invalid.
-- A network error indicates DNS, TLS, connection or timeout failure, not necessarily an invalid endpoint.
-- A host-mapping-required result means no request was sent because the base host is not confirmed.
+- Endpoint Inventory Scan sends only OPTIONS and, for read-only candidates, HEAD.
+- Authenticated Device List and Device Info tests use the session created by the user after logging into their own account.
+- No credentials, complete Device IDs, raw API response bodies, AccessToken, AppToken, signature, playback URL or private key are included in exported reports.
+- No account mutation, binding/unbinding, sharing, firmware update, password change/reset, SMS/email, billing, delete, token generation or secret retrieval is performed by the scanner.
+- Cloud Playback and AI Event remain `NOT_TESTED_VENDOR_SIGNER_REQUIRED` until Gwell confirms PBS VAS entitlement and provides a supported third-party signing method.
+- Live P2P is a manual SDK test. A returned `register()` call is not authentication proof. Successful live video requires the SDK to reach `STATE_PLAY`, report video dimensions greater than zero, and receive AV data.
 
-The scanner intentionally does not invoke business operations. In particular, sensitive legacy endpoints such as `Relationship/GetDevPwd.ashx`, account/password endpoints, device binding, owner switching, firmware upgrade and deletion are never called with GET/POST.
+## Interpreting Endpoint Inventory
 
-## Authenticated API Capability Test
-
-The separate **API Capability Test** uses the currently logged-in account session:
-- Calls authenticated Device List.
-- Calls the documented `/openapi/app/user/device/infoQuery` endpoint, trying `devId` and then `deviceId`.
-- Reports only sanitized API status, response field names and masked Device ID.
-- AI Event and Cloud Playback authorization remain NOT_TESTED until Gwell provides a supported third-party signing method and confirms PBS VAS entitlement.
-
-The public research scripts that call vPAAS APIs use a Frida signing oracle attached to a running Yoosee app. Their sample values are not PBS credentials. This app does not extract credentials from another app, reuse sample secrets or send unsigned VAS requests.
+- `DNS_LOOKUP_FAILED`: Android could not resolve the candidate hostname on the current network. This does not prove the service or endpoint has been discontinued.
+- `NETWORK_TIMEOUT`, `TLS_ERROR`, and `CONNECTION_ERROR`: transport diagnostics only.
+- HTTP 2xx/3xx/401/403/404/405/5xx: the server returned a response to OPTIONS/HEAD; this does not prove the business method, authentication or entitlement.
+- `dnsDiagnostics` lists host resolution results without exporting resolved IP addresses.
+- `summary` contains endpoint totals and an `attemptSummary` so repeated OPTIONS/HEAD attempts are not confused with endpoint counts.
+- `HOST_MAPPING_REQUIRED`: no request was sent because the base host is unknown.
 
 ## Run
 
-1. Install `PBS_Gwell_API_Capability_Test_v1.2.5.apk`.
-2. For authenticated tests, enter the AppID/AppToken issued for PBS and log in using an account you own.
-3. Use **API Capability Test** for authenticated Device List and Device Info checks.
-4. Use **Endpoint Inventory Scan · HEAD/OPTIONS** to inspect the endpoint inventory.
-5. Tap **Salin laporan JSON (redacted)** and share the report for analysis.
+1. Install `PBS_Gwell_API_Capability_Scanner_v1.2.6.apk`.
+2. Enter the AppID/AppToken issued for PBS and log in using an account you own.
+3. Use **API Capability Test** to test Device List and Device Info.
+4. Use **Buka Uji Live P2P Native** and start a test for the selected Device ID.
+5. Use **Endpoint Inventory Scan · HEAD/OPTIONS** to run DNS and route diagnostics.
+6. Copy the redacted JSON report and share it for analysis.
 
-The inventory scan can run without login because it sends no account credentials. Do not share passwords, AppToken, AccessToken, signatures or complete Device IDs.
+Do not share passwords, AppToken, AccessToken, signatures or complete Device IDs.
 
 ## Build
 
-GitHub Actions workflow: `.github/workflows/pbs-gwell-api-capability-v1.2.5.yml`.
-
-The workflow downloads the upstream GWTimes IoTVideo AAR, builds the APK, uploads an Actions artifact, and publishes the direct APK plus SHA-256 checksum.
+GitHub Actions workflow: `.github/workflows/pbs-gwell-api-capability-v1.2.6.yml`. It downloads the upstream GWTimes IoTVideo AAR, builds the debug APK, uploads a workflow artifact, and publishes the APK plus SHA-256 checksum to this branch.
 
 ## Licensing
 
