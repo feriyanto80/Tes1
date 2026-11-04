@@ -143,7 +143,7 @@ public final class NativeP2PActivity extends Activity {
             body.setPadding(dp(14),bars.top+dp(20),dp(14),bars.bottom+dp(30));
             return insets;
         });
-        body.addView(label("PBS · YOOSEE GUEST P2P v1.3.2",14,accent,true));
+        body.addView(label("PBS · YOOSEE GUEST P2P v1.3.3",14,accent,true));
         body.addView(label("Guest Auth & Backend Compatibility",23,white,true));
         body.addView(label("Device ID: "+deviceId,14,muted,false));
         body.addView(label("Akun guest dapat memiliki akses live yang sah. Pemeriksaan ini membedakan izin berbagi Yoosee, sesi Cloudlinks, identitas app PBS, dan penolakan SDK IoTVideo. Jalur GWell Legacy tetap read-only tanpa SDK resmi.",12,muted,false));
@@ -177,7 +177,7 @@ public final class NativeP2PActivity extends Activity {
         playSd.setOnClickListener(v->{selectedDefinition="SD";runAuthorizationPreflight(true);});
         stop.setOnClickListener(v->stopP2P());
         share.setOnClickListener(v->copyReport());
-        body.addView(label("v1.3.2 · Relasi guest (2) adalah indikasi akses berbagi, bukan otomatis tidak sah. Jika Yoosee resmi berhasil live menggunakan akun sama tetapi PBS error 8003, periksa perbedaan sesi SDK, identitas aplikasi, dan backend. Pemeriksaan tidak mengambil token aplikasi Yoosee atau mengubah sharing.",12,muted,false));
+        body.addView(label("v1.3.3 · Relasi guest (2) adalah indikasi akses berbagi, bukan otomatis tidak sah. Jika Yoosee resmi berhasil live menggunakan akun sama tetapi PBS error 8003, periksa perbedaan sesi SDK, identitas aplikasi, dan backend. Pemeriksaan tidak mengambil token aplikasi Yoosee atau mengubah sharing.",12,muted,false));
         if(!P2PSession.ready())event("SESSION_MISSING: Login cloud dahulu, lalu pilih Device ID kembali.");
     }
     private void runGuestCompatibilityDiagnostic(){
@@ -365,7 +365,7 @@ public final class NativeP2PActivity extends Activity {
     private void copyReport(){
         String events;
         synchronized(eventLog){events=eventLog.toString();}
-        String report="PBS Yoosee Guest P2P Authentication & Backend Compatibility diagnostic · build 1.3.2"+
+        String report="PBS Yoosee Guest P2P Authentication & Backend Compatibility diagnostic · build 1.3.3"+
                 "\nDevice ID: "+maskedDeviceId()+
                 "\nSDK init: "+PbsGwellApplication.getInitStatus()+
                 "\nprepared: "+prepared+
