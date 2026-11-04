@@ -191,7 +191,7 @@ public final class NativeP2PActivity extends Activity {
     private void copyReport(){
         String events;
         synchronized(eventLog){events=eventLog.toString();}
-        String report="PBS Native P2P v1.2.1"+
+        String report="PBS Native P2P diagnostic · build 1.2.6"+
                 "\nDevice ID: "+deviceId+
                 "\nSDK init: "+PbsGwellApplication.getInitStatus()+
                 "\nprepared: "+prepared+
