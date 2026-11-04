@@ -3,11 +3,11 @@ android {
     namespace 'com.pbsgroup.gwellcloudtest'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.pbsgroup.gwellcloudtest.p2pnative133gwell'
+        applicationId 'com.pbsgroup.gwellcloudtest.p2pnative134gwell'
         minSdk 26
         targetSdk 35
-        versionCode 13300
-        versionName '1.3.3'
+        versionCode 13400
+        versionName '1.3.4'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }
@@ -21,6 +21,14 @@ dependencies {
     implementation files('libs/iotvideo-release.aar')
     implementation files('libs/p2p-core-release.aar')
     implementation files('libs/libhttp-release.aar')
+    // GWellDemo vendor SDK has local AARs without transitive Maven metadata.
+    // These dependencies are required by its native-login/HTTP implementation.
+    implementation files('libs/javabase64.jar')
+    implementation files('libs/pano-release.aar')
+    implementation 'com.squareup.retrofit2:retrofit:2.6.2'
+    implementation 'com.squareup.retrofit2:converter-gson:2.6.2'
+    implementation 'com.jakewharton.retrofit:retrofit2-rxjava2-adapter:1.0.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.2.0'
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
     implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
