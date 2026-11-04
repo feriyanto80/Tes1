@@ -152,7 +152,7 @@ final class YooseeApi {
         HttpURLConnection c=(HttpURLConnection)new URL(address).openConnection();
         c.setRequestMethod(method); c.setConnectTimeout(12000); c.setReadTimeout(12000);
         c.setRequestProperty("Accept","application/json");
-        c.setRequestProperty("User-Agent","PBS-Gwell-Cloud-Diagnostic/1.0");
+        c.setRequestProperty("User-Agent","PBS-Gwell-Cloud-Diagnostic/1.2.6");
         if(headers!=null)for(Map.Entry<String,String> e:headers.entrySet())
             c.setRequestProperty(e.getKey(),e.getValue());
         if(body!=null){
