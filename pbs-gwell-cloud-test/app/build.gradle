@@ -3,11 +3,11 @@ android {
     namespace 'com.pbsgroup.gwellcloudtest'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.pbsgroup.gwellcloudtest.p2pnative127diag'
+        applicationId 'com.pbsgroup.gwellcloudtest.p2pnative128diag'
         minSdk 26
         targetSdk 35
-        versionCode 12702
-        versionName '1.2.7'
+        versionCode 12800
+        versionName '1.2.8'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildTypes { release { minifyEnabled false } }
