@@ -49,8 +49,8 @@ public final class MainActivity extends Activity {
             return insets;
         });
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
-        root.addView(label("PBS Yoosee Guest P2P v1.2.9",27,text,true));
-        root.addView(label("Login akun, daftar kamera, Dual Backend Diagnostic (IoTVideo + GWell Legacy), dan RTSP/ONVIF alternatif.",13,secondary,false));
+        root.addView(label("PBS Yoosee Native GWell v1.3.0",27,text,true));
+        root.addView(label("Login Cloud API, GWell Native P2P-Core live eksperimental, IoTVideo diagnostics, serta RTSP/ONVIF alternatif.",13,secondary,false));
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
         appToken=input(root,"AppToken yang sah (tidak disimpan)","",true);
@@ -70,6 +70,8 @@ public final class MainActivity extends Activity {
         Button detail=button(root,"Lihat informasi Device ID",false);
         Button liveBtn=button(root,"▶ Buka LIVE VIDEO + PTZ",true);
         liveBtn.setOnClickListener(v->openCameraViewer(deviceId.getText().toString().trim()));
+        Button gwellBtn=button(root,"▶ GWell Native P2P-Core LIVE (eksperimental)",true);
+        gwellBtn.setOnClickListener(v->openGwellNative(deviceId.getText().toString().trim()));
         Button p2pBtn=button(root,"🔐 Guest P2P Auth & Backend Diagnostic",true);
         p2pBtn.setOnClickListener(v->openNativeP2P(deviceId.getText().toString().trim()));
         Button cloudBtn=button(root,"☁ Cloud Recording / AI Event · cek akses",false);
@@ -86,7 +88,7 @@ public final class MainActivity extends Activity {
         box.addView(status);root.addView(box);
         Button share=button(root,"Bagikan laporan tanpa kredensial",false);
         root.addView(label("Keamanan: TLS certificate verification aktif. Tidak ada pencarian kombinasi password, impor daftar akun, penyimpanan token permanen, atau kirim data ke server PBS.",11,secondary,false));
-        root.addView(label("Live P2P IoTVideo masih dapat diuji melalui SDK GWTimes. Jalur GWell Legacy saat ini diagnostik metadata/DNS/runtime saja, belum live video tanpa SDK resmi. RTSP+ONVIF tetap tersedia sebagai alternatif.",11,secondary,false));
+        root.addView(label("Live P2P IoTVideo masih dapat diuji melalui SDK GWTimes. Jalur GWell kini memiliki integrasi SDK native 2019 terpisah, memerlukan vendor APPVersion dan sesi login GWell tersendiri. RTSP+ONVIF tetap tersedia sebagai alternatif.",11,secondary,false));
         login.setOnClickListener(v->runLogin());
         list.setOnClickListener(v->execute("DEVICE_LIST",()->{
             ensureSession();
@@ -120,6 +122,15 @@ public final class MainActivity extends Activity {
         share.setOnClickListener(v->share());
     }
 
+    private void openGwellNative(String id){
+        if(id==null || !id.matches("[A-Za-z0-9_-]{1,100}")){
+            setStatus("Pilih Device ID kamera dahulu.");
+            return;
+        }
+        Intent nativeGwell=new Intent(this,GwellNativeActivity.class);
+        nativeGwell.putExtra("device_id",id);
+        startActivity(nativeGwell);
+    }
     private void openNativeP2P(String id){
         if(!P2PSession.ready()){
             setStatus("SESSION_MISSING: Login ke Gwell Cloud dulu untuk memperoleh sesi.");
@@ -265,7 +276,7 @@ public final class MainActivity extends Activity {
     private void share(){
         Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");
         i.putExtra(Intent.EXTRA_SUBJECT,"PBS Gwell Cloud Diagnostic");
-        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.2.9\n"+lastReport+
+        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.3.0\n"+lastReport+
             "\nTidak memuat password, AppToken, P2P Device ID, atau sesi akses.");
         startActivity(Intent.createChooser(i,"Bagikan laporan diagnostik"));
     }
