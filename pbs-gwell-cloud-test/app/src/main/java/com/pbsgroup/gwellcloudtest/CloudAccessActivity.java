@@ -40,7 +40,7 @@ public final class CloudAccessActivity extends Activity {
         root.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(root);setContentView(scroll);
         root.addView(text("PBS CCTV · CLOUD ACCESS",12,accent,true));
         root.addView(text("Cloud Recording & AI Event",25,white,true));
-        root.addView(text("Status integrasi v1.2.2. Halaman ini memeriksa kesiapan akses, bukan menampilkan rekaman yang belum mendapat otorisasi vendor.",13,muted,false));
+        root.addView(text("Status integrasi v1.2.6. Halaman ini memeriksa kesiapan akses, bukan menampilkan rekaman yang belum mendapat otorisasi vendor.",13,muted,false));
         section(root,"Yoosee AppID / AppToken",
                 "Kredensial aplikasi yang digunakan untuk login Cloudlinks dan mengambil daftar perangkat.",
                 "TERSEDIA DI KONFIGURASI LOGIN — validasi dilakukan saat login.");
@@ -61,7 +61,7 @@ public final class CloudAccessActivity extends Activity {
         LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=dp(14);root.addView(note,np);
         Button copy=new Button(this);copy.setText("Salin permintaan akses untuk Gwell");copy.setAllCaps(false);
         copy.setOnClickListener(v->{
-            String request="Mohon konfirmasi dan aktifkan akses resmi untuk aplikasi PBS (package com.pbsgroup.gwellcloudtest.p2pnative122) menggunakan AppID/AppToken PBS: (1) API VAS AI Event list/detail, (2) Cloud Recording playback URL/HLS, (3) product/package binding dan otorisasi Device ID milik PBS, (4) dokumentasi metode autentikasi dan signing resmi untuk aplikasi pihak ketiga, (5) pagination, rate limit, masa berlaku HLS URL, dan ketentuan download. Mohon informasikan apakah diperlukan kredensial partner tambahan di luar AppID/AppToken.";
+            String request="Mohon konfirmasi dan aktifkan akses resmi untuk aplikasi PBS (package com.pbsgroup.gwellcloudtest.p2pnative126) menggunakan AppID/AppToken PBS: (1) API VAS AI Event list/detail, (2) Cloud Recording playback URL/HLS, (3) product/package binding dan otorisasi Device ID milik PBS, (4) dokumentasi metode autentikasi dan signing resmi untuk aplikasi pihak ketiga, (5) pagination, rate limit, masa berlaku HLS URL, dan ketentuan download. Mohon informasikan apakah diperlukan kredensial partner tambahan di luar AppID/AppToken.";
             ((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Gwell VAS access request",request));
             copy.setText("Permintaan sudah disalin");
         });
