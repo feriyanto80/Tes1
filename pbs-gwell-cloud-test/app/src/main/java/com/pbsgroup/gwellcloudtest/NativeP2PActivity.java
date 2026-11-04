@@ -18,6 +18,7 @@ import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.view.WindowInsets;
 
 import com.tencentcs.iotvideo.IoTVideoSdk;
 import com.tencentcs.iotvideo.iotvideoplayer.CallTypeEnum;
@@ -137,6 +138,11 @@ public final class NativeP2PActivity extends Activity {
         ScrollView sc=new ScrollView(this);sc.setBackgroundColor(bg);
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(14),dp(20),dp(14),dp(30));sc.addView(body);setContentView(sc);
+        sc.setOnApplyWindowInsetsListener((view,insets)->{
+            android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());
+            body.setPadding(dp(14),bars.top+dp(20),dp(14),bars.bottom+dp(30));
+            return insets;
+        });
         body.addView(label("PBS · YOOSEE GUEST P2P v1.2.9",14,accent,true));
         body.addView(label("Guest Auth & Backend Compatibility",23,white,true));
         body.addView(label("Device ID: "+deviceId,14,muted,false));
