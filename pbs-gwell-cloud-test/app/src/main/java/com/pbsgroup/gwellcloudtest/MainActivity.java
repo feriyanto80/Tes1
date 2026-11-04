@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
             return insets;
         });
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
-        root.addView(label("PBS Gwell API Test",27,text,true));
+        root.addView(label("PBS Gwell API Test v1.2.5",27,text,true));
         root.addView(label("Login akun, daftar kamera, API Capability Test, Native P2P diagnostics, dan RTSP/ONVIF alternative.",13,secondary,false));
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
@@ -76,6 +76,8 @@ public final class MainActivity extends Activity {
         cloudBtn.setOnClickListener(v->startActivity(new Intent(this,CloudAccessActivity.class)));
         Button capabilityBtn=button(root,"🧪 API Capability Test",false);
         capabilityBtn.setOnClickListener(v->{Intent test=new Intent(this,ApiCapabilityActivity.class);test.putExtra("device_id",deviceId.getText().toString().trim());startActivity(test);});
+        Button endpointInventoryBtn=button(root,"🧭 Endpoint Inventory Scan · HEAD/OPTIONS",false);
+        endpointInventoryBtn.setOnClickListener(v->startActivity(new Intent(this,EndpointInventoryActivity.class)));
         Button logout=button(root,"Hapus sesi di memori",false);
         section(root,"03 · HASIL DIAGNOSTIK");
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(14),dp(14),dp(14),dp(14));
