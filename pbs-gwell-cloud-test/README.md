@@ -1,117 +1,89 @@
-# PBS Yoosee v1.2.9 — Guest P2P Authentication & Backend Compatibility
+# PBS Yoosee v1.3.0 — Native GWell P2P-Core Integration
 
-**Cumulative Android diagnostic release**, based on v1.2.8.
-Package: `com.pbsgroup.gwellcloudtest.p2pnative129diag`.
-Version Code: `12900`, Version Name: `1.2.9`.
-Installs **side by side** with v1.2.8 (different package ID).
+Cumulative Android source based on PBS Yoosee v1.2.9. Built for diagnostic/research only.
 
-## Confirmed user observation (not hard-coded into the app)
+## What changed
 
-Camera 38819486 is shared to a **guest** account. The **same account**
-successfully plays live video through official Yoosee on the same phone/network,
-but the PBS IoTVideo SDK returns `8003`. Device list `relation=2`
-is consistent with a guest-like relation in the [GWTimes demo](https://github.com/GWTimes/IoTVideo-Android/blob/master/app/src/main/java/com/tencentcs/iotvideodemo/accountmgr/devicemanager/DeviceListFragment.java).
-The exact Cloudlinks API enum semantics are not independently confirmed.
+- **Actual GWell P2P-Core Android SDK integration** (archived 2019 version)
+  based on the vendor sample at https://github.com/jwkj/GwellDemo .
+- An independently accessible Native GWell screen (not only DNS/read-only).
+  Auth flow: GWell SDK `P2PSpecial.init(app, AppID, AppToken, APPVersion)`,
+  `HttpSend.login` to obtain **GWell-specific** UserID, SessionID1/2,
+  P2PVerifyCode1/2; `P2PHandler.p2pInit` and `p2pConnect()`; get
+  device status and P2P protocol version, `MediaPlayer.setP2PLibVersion`,
+  `P2PHandler.call`, `vAccept`, `vConnectReady`, `P2PView`, native PTS.
+- Maintains the earlier **IoTVideo HD/SD diagnostics, user/guest preflight,
+  Cloud API list/detail, API capability, endpoint scan, RTSP/ONVIF**.
+- Distinguishes *SDK init*, *vendor login accepted*, *P2P registered*,
+  *protocol version received*, *monitor signaling accepted*, *monitor ready*,
+  and *actual video timing callback*. None of the earlier states proves video.
+- No default passwords, no copying demo AppID/AppToken, no bypass of guest
+  permissions, no unbind/reset, no session secrets in report.
+- No session persistence: vendor account password, device monitor password,
+  session IDs and verify codes are held only during the live process.
+- The native SDK requires a **vendor registered** AppID/AppToken and
+  **APPVersion** `XX.XX.XX.XX`; Android `versionName=1.3.0` is unrelated.
+  The SDK may also bind credentials to the registered package name.
 
-**Conclusion:** Guest access must **not** automatically be classified as
-invalid. A successful official Yoosee guest stream does not automatically
-authorize a separately registered IoTVideo client/app product namespace.
+## Camera 38819486: what is known
 
-## Changes from v1.2.8
+Official Yoosee shows guest live on the same account/phone/network.
+Cloudlinks shows `relationCode=2`, device listed. PBS IoTVideo shows error
+`8003` before frames even for HD and SD.
 
-- Adds **Guest Auth & Backend Compatibility** button and a user-controlled
-  confirmation checkbox: "same account + shared/guest camera + official
-  Yoosee live works." This field is not assumed true without the user's
-  confirmation on the device.
-- Adds `GuestP2PCompatibilityDiagnostic`, an offline/read-only guest-session
-  compatibility analyzer. Compares Cloud API listing / relationship codes,
-  official Yoosee installation, PBS application package, validity **shape**
-  of access ID and in-memory token (never token contents), AppID presence,
-  and the **availability of public SDK registration status APIs**.
-- SDK API introspection examines method names and signatures only; it does
-  not invoke undocumented registration endpoints or inspect official
-  Yoosee's private process data.
-- Specifically classifies `errorCode=8003` when a guest relation is listed
-  and the user confirms official same-account playback, identifying a
-  **client/P2P authorization or backend mismatch requiring vendor confirmation**,
-  *not* denying guest sharing rights.
-- Retains read-only authenticated device-list and info-query preflight,
-  verified HD/SD IoTVideo session callbacks, network metrics, first-frame
-  evidence, and the v1.2.8 Legacy GWell family/runtime/DNS diagnostic.
-- Downgrades short-numeric-Device-ID-only results to
-  `UNCONFIRMED_BACKEND_LEGACY_ID_HINT` so the 8-digit heuristic is never
-  portrayed as definitive backend discovery.
-- Improves Android status/navigation safe-area padding on the native
-  diagnostic screen.
-- Preserves API capability inventory, endpoint probes, Cloud access checks,
-  existing RTSP/ONVIF alternative, and redacted report export.
+The GWell SDK is a different backend/session flow: Cloudlinks
+`AccessID/AccessToken` MUST NOT be blindly reused as GWell native
+`SessionID1/2` and `P2PVerifyCode1/2`.
 
-## Interpretation of code 8003
+## Test
 
-The [GWTimes IoTVideo error header](https://github.com/GWTimes/IoTVideoSDK-iOS/blob/master/Frameworks/IoTVideo.framework/Headers/IVError.h)
-defines ASrv error `8003` as invalid device/user relationship, but exact
-mapping of the archived Android player callback for the PBS device has not
-been proven. For a working guest account, possible causes include a
-different product namespace, IoTVideo permission/guest scope, token format
-or transport/backend. **No one cause has been proven by the v1.2.8 log.**
+1. Install `PBS_Yoosee_Native_GWell_v1.3.0.apk` alongside v1.2.9.
+2. Select Device ID 38819486 in main PBS screen; choose **GWell Native
+   P2P-Core LIVE (eksperimental)**.
+3. Enter **AppID**, **AppToken**, and **APPVersion** assigned by the GWell
+   vendor for the actual PBS application and an authorized guest Yoosee
+   account/password. The existing Cloudlinks AppID/AppToken can be
+   prefilled but **may not be entitled** to this native GWell package.
+4. Enter the **device monitoring password** supplied by the camera owner.
+   It is never guessed, logged, or stored.
+5. Tap **Init GWell SDK & login akun**, watch for `GWELL_LOGIN_OK` and
+   `GWELL_P2P_CONNECTED`. Even a successful connection isn't live proof.
+6. Tap **Periksa P2P Device & Versi**. Wait for
+   `GWELL_DEVICE_VERSION_VERIFIED` from the SDK. This sets the P2P
+   protocol generation for the selected camera.
+7. Tap **Mulai Live GWell P2P**; inspect `GWELL_V_ACCEPT`,
+   `GWELL_MONITOR_READY`, `GWELL_VIDEO_PTS_RECEIVED` and the video.
+8. Tap **Salin laporan**; report contains only redacted, safe diagnostics.
 
-GWell's legacy P2P uses a different session and verification flow
-([GwellDemo](https://github.com/dxsdyhm/GwellDemo)).
-The 2018 `com.p2p.core` SDK is not included; a supported, properly licensed
-native SDK and documented session provider are necessary before PBS can
-attempt **actual Legacy GWell live video**. The v1.2.9 GWell diagnostic
-remains **read-only**. DNS resolution or camera listing does not prove
-a native session.
+Without valid GWell credentials and device monitor password, live remains
+unverified. Never reset/transfer/unbind the working official camera.
 
-## Install and use
+## Build / dependency scope
 
-1. Install `PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9.apk`.
-2. Log into PBS with **authorized** Yoosee/GWell AppID/AppToken and the same
-   Yoosee account. Do not paste credentials into reports or messages.
-3. Select Device ID 38819486 and open Guest P2P Diagnostic.
-4. If you personally verified official Yoosee live using the **same account**,
-   select the checkbox on the screen. It is OFF by default.
-5. Press **Uji Guest Auth & Backend Compatibility**. Inspect
-   `GUEST_P2P_COMPAT`, `AUTH_PREFLIGHT_RESULT`,
-   and `BACKEND_ASSESSMENT`. Copy the redacted report.
-6. For an independent IoTVideo reproduction, press HD or SD Live Test and
-   export a second report. `REGISTER_CALL_RETURNED` is **not**
-   proof of server login. `MEDIA_VERIFIED` requires PLAY, dimensions,
-   and AV bytes.
-7. Never unbind, reset, or change camera ownership as a diagnostic shortcut.
+This is a source-cumulative release, **not a standalone redistributable
+license** for third-party native binaries. The workflow fetches the publicly
+available archived sample dependencies temporarily:
+- `GWTimes/IoTVideo-Android/app/libs/iotvideo-release.aar`
+- `jwkj/GwellDemo/app/libs/p2p-core-release.aar`
+- `jwkj/GwellDemo/app/libs/libhttp-release.aar`
 
-## Build
+These SDK binaries are NOT included in the source ZIP; they are included
+in the diagnostic debug APK. Validate redistribution/commercial licensing
+with the vendor before use in production. Android 16/runtime/firmware and
+server compatibility are **not guaranteed by a successful build**.
 
-GitHub workflow:
-`.github/workflows/pbs-yoosee-guest-p2p-v1.2.9.yml`.
-It fetches the archived publicly available GWTimes demo IoTVideo AAR as a
-build-time dependency, compiles with Android SDK 35 and Gradle 8.10.2,
-publishes APK and cumulative source ZIP with SHA-256. **Third-party SDK
-binaries are not redistributed in the source ZIP**. Production/commercial
-deployment requires vendor SDK and licensing confirmation.
+Workflow: `.github/workflows/pbs-yoosee-native-gwell-v1.3.0.yml`.
+Android package: `com.pbsgroup.gwellcloudtest.p2pnative130gwell`.
+versionCode: 13000; versionName: 1.3.0.
 
-Locally, install a properly licensed compatible
-`pbs-gwell-cloud-test/app/libs/iotvideo-release.aar`, then run:
+## Sources and references
 
-```bash
-gradle -p pbs-gwell-cloud-test :app:assembleDebug --no-daemon --stacktrace
-```
+- https://github.com/jwkj/GwellDemo (Android P2P 0.5.4 AAR, 2019)
+- https://github.com/jwkj/GwellDemo/blob/master/app/src/main/java/com/example/dansesshou/jcentertest/LoginActivity.java
+- https://github.com/jwkj/GwellDemo/blob/master/app/src/main/java/com/example/dansesshou/jcentertest/MonitorActivity.java
+- https://github.com/jwkj/GwellDemo/blob/master/app/src/main/java/service/MainService.java
+- https://github.com/GWTimes/GWP2PSDK (vendor AppID/AppToken/version restrictions)
 
-The GitHub Action creates a debug-signed APK. Because package identity
-changes, v1.2.9 is a separate diagnostic installation; it does not claim
-to be an in-place update signed with an existing private release key.
-
-## Scope and limits
-
-**Implemented:** guest-aware evidence, safe session-shape checks,
-app/backend differential diagnosis, SDK method-availability inspection,
-redacted reporting, existing IoTVideo playback test.
-
-**Not implemented:** taking live video via GWell Legacy; extracting
-third-party app tokens; impersonating official Yoosee app identity;
-bypassing owner/guest authorization; proving server-side SDK entitlement
-without vendor API; hardware test on the user's own camera.
-
-No raw API response bodies, complete Device IDs, passwords,
-AccessTokens, AppTokens, signatures, private keys, or official Yoosee
-internal data are included in exported diagnostic reports.
+Experimental release scope: this implements a native GWell call path, but
+neither confirms server auth nor guarantees first frame for the user's
+camera until real-device tests pass.
