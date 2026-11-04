@@ -107,7 +107,7 @@ public final class ApiCapabilityActivity extends Activity {
             String selectedId=requestedId;
             try{
                 report.put("application","PBS Yoosee API Capability Test");
-                report.put("version","1.2.3");
+                report.put("version","1.2.4");
                 report.put("generatedAtUtc",utcNow());
                 report.put("testMode","READ_ONLY");
                 report.put("credentialsIncluded",false);
@@ -128,46 +128,55 @@ public final class ApiCapabilityActivity extends Activity {
                         int code=response.optInt("code",-1);
                         JSONArray list=extractDeviceList(response);
                         int count=list==null?0:list.length();
+                        JSONObject first=list==null||list.length()==0?null:list.optJSONObject(0);
+                        String firstKeys=first==null?"none":keys(first);
                         add(tests,"DEVICE_LIST","0".equals(String.valueOf(code))||code==0?"PASS":"API_REJECTED",
                                 "HTTP "+response.optInt("_httpStatus",-1)+"; API code "+code+
-                                "; deviceCount "+count+"; latencyMs "+elapsed,elapsed);
-                        if(empty(selectedId)&&count>0){
-                            JSONObject first=list.optJSONObject(0);
-                            if(first!=null)selectedId=firstId(first);
-                        }
+                                "; deviceCount "+count+"; firstDeviceFields "+firstKeys+
+                                "; latencyMs "+elapsed,elapsed);
+                        if(empty(selectedId)&&first!=null)selectedId=firstId(first);
                     }catch(Exception e){
                         add(tests,"DEVICE_LIST","ERROR",safeClass(e),System.currentTimeMillis()-start);
                     }
 
                     if(!empty(selectedId)&&selectedId.matches("[A-Za-z0-9_-]{1,100}")){
-                        start=System.currentTimeMillis();
-                        try{
-                            JSONObject response=api.deviceInfo(selectedId);
-                            long elapsed=System.currentTimeMillis()-start;
-                            int code=response.optInt("code",-1);
-                            JSONObject data=response.optJSONObject("data");
-                            String fields=data==null?"none":data.names()==null?"none":data.names().toString();
-                            String online="not_returned";
-                            if(data!=null){
-                                for(String key:new String[]{"online","isOnline","status","deviceStatus"}){
-                                    if(data.has(key)){online=String.valueOf(data.opt(key));break;}
+                        boolean infoQueryPassed=false;
+                        for(String parameter:new String[]{"devId","deviceId"}){
+                            if(infoQueryPassed)break;
+                            start=System.currentTimeMillis();
+                            try{
+                                JSONObject response=api.deviceInfoQuery(selectedId,parameter);
+                                long elapsed=System.currentTimeMillis()-start;
+                                int code=response.optInt("code",-1);
+                                JSONObject data=response.optJSONObject("data");
+                                String fields=data==null?"none":keys(data);
+                                String msg=safeMessage(response.optString("msg",""));
+                                String online="not_returned";
+                                if(data!=null){
+                                    for(String key:new String[]{"online","isOnline","status","deviceStatus","linkType"}){
+                                        if(data.has(key)){online=String.valueOf(data.opt(key));break;}
+                                    }
                                 }
+                                infoQueryPassed=(code==0);
+                                add(tests,"DEVICE_INFO_QUERY_"+parameter.toUpperCase(Locale.ROOT),
+                                        infoQueryPassed?"PASS":"API_REJECTED",
+                                        "GET /openapi/app/user/device/infoQuery; parameter="+parameter+
+                                        "; HTTP "+response.optInt("_httpStatus",-1)+"; API code "+code+
+                                        "; msg="+msg+"; onlineField="+online+"; dataKeys="+fields+
+                                        "; deviceId="+maskId(selectedId)+"; latencyMs="+elapsed,elapsed);
+                            }catch(Exception e){
+                                add(tests,"DEVICE_INFO_QUERY_"+parameter.toUpperCase(Locale.ROOT),
+                                        "ERROR",safeClass(e),System.currentTimeMillis()-start);
                             }
-                            add(tests,"DEVICE_INFO",code==0?"PASS":"API_REJECTED",
-                                    "HTTP "+response.optInt("_httpStatus",-1)+"; API code "+code+
-                                    "; onlineField "+online+"; dataKeys "+fields+
-                                    "; deviceId "+maskId(selectedId)+"; latencyMs "+elapsed,elapsed);
-                        }catch(Exception e){
-                            add(tests,"DEVICE_INFO","ERROR",safeClass(e),System.currentTimeMillis()-start);
                         }
                     }else{
-                        add(tests,"DEVICE_INFO","SKIPPED","Device ID tidak diberikan dan tidak dapat diambil dari respons list.",0);
+                        add(tests,"DEVICE_INFO_QUERY","SKIPPED","Device ID tidak diberikan dan tidak dapat diambil dari respons list.",0);
                     }
                     api.close();
                 }else{
                     add(tests,"SESSION","BLOCKED","Login terlebih dahulu melalui layar utama; AppID/AppToken harus diisi oleh pemilik aplikasi.",0);
                     add(tests,"DEVICE_LIST","SKIPPED","Tidak ada sesi akun yang tersedia di memori.",0);
-                    add(tests,"DEVICE_INFO","SKIPPED","Tidak ada sesi akun atau Device ID yang dapat diuji.",0);
+                    add(tests,"DEVICE_INFO_QUERY","SKIPPED","Tidak ada sesi akun atau Device ID yang dapat diuji.",0);
                 }
 
                 probe(tests,"OPENAPI_BASE","openapi-iot.cloudlinks.cn","/openapi/app");
@@ -218,6 +227,15 @@ public final class ApiCapabilityActivity extends Activity {
         }
         return response.optJSONArray("data");
     }
+    private String keys(JSONObject object){
+        JSONArray names=object.names();
+        return names==null?"none":names.toString();
+    }
+    private String safeMessage(String message){
+        if(empty(message))return "not_returned";
+        String clean=message.replaceAll("[\\r\\n\\t]"," ").replaceAll("[^A-Za-z0-9 _().,:/-]","");
+        return clean.length()>120?clean.substring(0,120):clean;
+    }
     private String firstId(JSONObject row){
         for(String k:new String[]{"deviceId","devId","deviceID","device_id","id"}){
             String v=row.optString(k,"");if(!empty(v)&&!"null".equalsIgnoreCase(v))return v;
@@ -232,7 +250,7 @@ public final class ApiCapabilityActivity extends Activity {
             c=(HttpsURLConnection)url.openConnection();
             c.setRequestMethod("HEAD");c.setConnectTimeout(8000);c.setReadTimeout(8000);
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent","PBS-Yoosee-Capability-Test/1.2.3");
+            c.setRequestProperty("User-Agent","PBS-Yoosee-Capability-Test/1.2.4");
             c.setRequestProperty("Accept","application/json");
             int http=c.getResponseCode();
             long elapsed=System.currentTimeMillis()-start;
