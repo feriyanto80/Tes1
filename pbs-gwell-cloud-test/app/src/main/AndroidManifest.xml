@@ -6,14 +6,14 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <queries><package android:name="com.yoosee" /></queries>
     <application tools:replace="android:label" android:name=".PbsGwellApplication" android:allowBackup="false" android:usesCleartextTraffic="true"
-        android:label="PBS Yoosee Native GWell P2P 1.3.1"
+        android:label="PBS Yoosee Native GWell Crash Guard 1.3.2"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".CloudAccessActivity" android:exported="false" />
         <activity android:name=".ApiCapabilityActivity" android:exported="false" />
         <activity android:name=".EndpointInventoryActivity" android:exported="false" />
         <activity android:name=".NativeP2PActivity" android:exported="false" />
         <activity android:name=".GwellLauncherActivity" android:exported="false" />
-        <activity android:name=".GwellNativeActivity" android:exported="false" />
+        <activity android:name=".GwellNativeActivity" android:exported="false" android:process=":gwell" />
         <activity android:name=".CameraViewerActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
