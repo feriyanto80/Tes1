@@ -1,4 +1,78 @@
-# PBS Yoosee v1.3.1 — Native GWell Launcher & P2P-Core Integration
+# PBS Yoosee v1.3.2 — Native GWell Crash Guard
+
+**Cumulative release**, based on v1.3.1, retaining all Cloudlinks API, IoTVideo, RTSP/ONVIF, and GWell P2P-Core integration.
+
+## Device crash report, 4 November 2026
+
+The user confirmed that Device ID 38819486 was entered successfully, but launching
+**GWell Native P2P-Core** on Android 16 immediately displayed "keeps stopping",
+before any GWell credentials could be entered.
+
+**Crash root cause is not yet proven without Android crash stack / native tombstone.**
+Do not attribute this to IoTVideo error 8003, guest sharing or an invalid APPVersion
+until a stack trace supports that conclusion. The archived GWell SDK is from 2019.
+
+## v1.3.2 fix
+
+- Legacy GWell native Activity launches in a **dedicated Android process** via
+  `android:process=":gwell"`, so a Java or native fatal failure does not
+  directly terminate the main PBS UI process.
+- A **stable SDK-free launcher** retains the Device ID and never loads
+  `GwellNativeActivity.class` while showing its initial screen.
+- Global uncaught Java exception handler writes **exception class and method
+  locations only**, omitting messages, tokens, passwords and full device IDs.
+  Persisted in app-private storage and displayed from the main process on return.
+- Lifecycle breadcrumbs: `NATIVE_START_REQUESTED`, `NATIVE_ACTIVITY_ONCREATE_OK`,
+  `NATIVE_UI_READY`, `NATIVE_EXITED`, `JAVA_FATAL_RECORDED`.
+  If a native SIGSEGV/abort occurs, this Java handler cannot capture a stack;
+  use ADB logcat or Android tombstones, while the main process remains usable.
+- IoTVideo SDK initialization is skipped inside the isolated GWell process,
+  to avoid initializing two competing SDK engines during native entry.
+- No automatic replay, owner modification, credential extraction, or
+  unsafe authentication bypass.
+- All features and native GWell login/P2P flows from 1.3.0/1.3.1 are retained.
+
+## Install and test
+
+1. Install `PBS_Yoosee_Native_GWell_v1.3.2.apk` (distinct package
+   `com.pbsgroup.gwellcloudtest.p2pnative132gwell`; installs side-by-side
+   with previous debug APKs, preventing debug signing-key collision).
+2. Choose Device ID 38819486 and tap **GWell Native P2P-Core LIVE**.
+3. In the stable launcher press **Buka GWell Native Player**.
+4. If the native process stops, go back to the launcher and press
+   **Salin diagnostik & crash terakhir**. Share the copied text.
+5. If it does not stop, follow the GWell login and device-version flow from
+   v1.3.0. **AppID, AppToken and APPVersion must be vendor-authorized**.
+   Because the GWell engine now runs in a separate process, credentials
+   held only in the Cloudlinks main process are not automatically shared;
+   enter vendor credentials directly on the native screen.
+6. Only claim successful live when the video actually appears.
+
+If the diagnostic shows `javaCrash=NOT_RECORDED` but native process is gone,
+a native C/C++ fatal crash may have occurred. On a computer with ADB:
+
+```bash
+adb logcat -b crash -d -v time > PBS_GWell_crash.txt
+```
+
+Review/redact any private device IDs, credentials, URLs, or tokens in the
+ADB output before sharing. Android crashes before the Java handler starts
+may also not be recorded.
+
+## SDK sources and limitations
+
+- https://github.com/jwkj/GwellDemo
+- https://github.com/GWTimes/GWP2PSDK
+
+Third-party AAR binaries are fetched only by the build workflow, excluded
+from the source ZIP. The experimental APK embeds these libraries for test
+purposes; production use requires vendor licensing and confirmation of
+Android 16 compatibility. **Build success is not proof of functional live
+video or native SDK runtime compatibility.**
+
+---
+
+## Historical v1.3.1 README
 
 Cumulative Android source based on PBS Yoosee v1.3.0, retaining the v1.2.9 features. Built for diagnostic/research only.
 
