@@ -1,4 +1,81 @@
-# PBS Yoosee v1.3.3 — Android 16 Dynamic Receiver Compatibility
+# PBS Yoosee v1.3.4 — GWell Native Runtime Dependency Repair
+
+Cumulative source from v1.3.3. Retains GWell native player, isolated
+`:gwell` process, receiver compatibility for Android 14–16, IoTVideo,
+Cloudlinks, API capability, and RTSP/ONVIF features.
+
+## Device report — 4 November 2026
+
+After successful UI launch on Android API 36, the user tapped
+**Init GWell SDK & login akun**, producing:
+
+```text
+GWELL_INIT_FAILED: NoClassDefFoundError
+```
+
+The error happens **inside** `P2PSpecial.getInstance().init()`.
+It is a Java class linkage/dependency problem, not yet a vendor login rejection,
+guest-sharing problem, or Device-ID-specific error. The v1.3.3 report
+redacted the missing class name, so the precise class was not captured.
+
+## Fixes in v1.3.4
+
+1. Supply missing transitive libraries from the archived
+   [GWellDemo app/build.gradle](https://github.com/jwkj/GwellDemo/blob/master/app/build.gradle):
+   - `com.squareup.retrofit2:retrofit:2.6.2`
+   - `com.squareup.retrofit2:converter-gson:2.6.2`
+   - `com.jakewharton.retrofit:retrofit2-rxjava2-adapter:1.0.0`
+   - `com.squareup.okhttp3:logging-interceptor:4.2.0`
+   - Existing RxJava2, RxAndroid and Gson retained.
+2. Supply other vendor demo binary companions at build time,
+   `pano-release.aar` and `javabase64.jar`. The SDK AARs are local file
+   dependencies, so Gradle cannot infer their transitive Maven dependencies.
+3. Add **0 · Uji dependency SDK (tanpa login)**. The classpath check inspects
+   SDK/login, Retrofit, Gson, OkHttp and RxJava class availability without
+   account access, camera authentication or network calls.
+4. If SDK initialization still fails, report a sanitized Java
+   missing-class symbol (when safely parsable) and top SDK caller frames
+   rather than only `NoClassDefFoundError`.
+5. Do not automatically retry vendor login or guess camera credentials.
+6. Use a distinct application ID
+   `com.pbsgroup.gwellcloudtest.p2pnative134gwell` to avoid debug
+   signing-key conflicts with earlier builds.
+
+## Test
+
+1. Install `PBS_Yoosee_Native_GWell_v1.3.4.apk` side by side with v1.3.3.
+2. Select camera 38819486 and open **GWell Native P2P-Core LIVE**.
+3. Tap **Buka GWell Native Player** in the stable launcher.
+4. Tap **0 · Uji dependency SDK (tanpa login)** first. You do **not**
+   need to enter username/password/AppToken for this test.
+5. If all required classes are `FOUND`, vendor initialization can be
+   tested using authorized GWell AppID/AppToken and APPVersion. Example
+   `01.02.03.04` is **not a verified PBS vendor APPVersion**.
+6. If initialization fails, use **Salin laporan** and share the redacted
+   `GWELL_INIT_FAILED` section including `missingClass` / caller frames.
+7. Only claim native live success if an actual video frame appears.
+   A Java class check being `FOUND` is not proof of vendor entitlement
+   or device P2P compatibility.
+
+## Limitations
+
+- Missing-class diagnosis is inferred from the archived SDK dependency list;
+  the exact missing class from v1.3.3 was not available.
+- An actual missing C/C++ symbol or incompatible native `.so` can still fail
+  with `UnsatisfiedLinkError` or process abort; a separate native log is needed.
+- No production redistribution or license grant for vendor binaries is implied.
+  The GitHub workflow downloads archived public demo AARs temporarily;
+  source ZIP excludes SDK binaries.
+- AppID / AppToken / APPVersion must be registered with the GWell vendor.
+  Public sample credentials and guessed APPVersion are not valid PBS production
+  configuration. Never export or share account or monitor passwords.
+- Runtime success is only verifiable on the target Android device.
+
+---
+
+## Historical release notes
+
+## PBS Yoosee v1.3.3 — Android Receiver Compatibility
 
 Cumulative release based on v1.3.2. Existing Cloud API/IoTVideo/RTSP/GWell native
 code and protective native process isolation are preserved.
