@@ -3,6 +3,7 @@ package com.pbsgroup.gwellcloudtest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -85,6 +86,8 @@ public final class ApiCapabilityActivity extends Activity {
 
         runButton=button(root,"▶ Jalankan API Capability Test",true);
         runButton.setOnClickListener(v->runTests());
+        Button liveP2p=button(root,"▶ Buka Uji Live P2P Native",false);
+        liveP2p.setOnClickListener(v->openNativeP2P());
         Button copy=button(root,"Salin laporan JSON (redacted)",false);
         copy.setOnClickListener(v->copyReport());
         Button back=button(root,"Kembali",false);back.setOnClickListener(v->finish());
@@ -97,6 +100,20 @@ public final class ApiCapabilityActivity extends Activity {
         root.addView(label("PENTING: AI Event dan Cloud Playback memerlukan autentikasi/signature VAS yang didukung vendor. Aplikasi hanya memeriksa konektivitas HTTPS host; tidak mengirim request VAS tanpa signer resmi. Respons HTTP dari HEAD bukan bukti hak akses API.",11,muted,false));
     }
     private boolean empty(String s){return s==null||s.trim().isEmpty();}
+    private void openNativeP2P(){
+        String id=deviceIdInput.getText().toString().trim();
+        if(!P2PSession.ready()){
+            status("LOGIN REQUIRED: login ke akun Yoosee/Gwell terlebih dahulu.");
+            return;
+        }
+        if(empty(id)||!id.matches("[A-Za-z0-9_-]{1,100}")){
+            status("Masukkan Device ID kamera milik akun Anda terlebih dahulu.");
+            return;
+        }
+        Intent intent=new Intent(this,NativeP2PActivity.class);
+        intent.putExtra("device_id",id);
+        startActivity(intent);
+    }
     private void runTests(){
         if(runButton!=null)runButton.setEnabled(false);
         status("Menjalankan pengujian. Proses berjalan di background; jangan tutup aplikasi.");
@@ -107,7 +124,7 @@ public final class ApiCapabilityActivity extends Activity {
             String selectedId=requestedId;
             try{
                 report.put("application","PBS Yoosee API Capability Test");
-                report.put("version","1.2.5");
+                report.put("version","1.2.6");
                 report.put("generatedAtUtc",utcNow());
                 report.put("testMode","READ_ONLY");
                 report.put("credentialsIncluded",false);
@@ -133,45 +150,82 @@ public final class ApiCapabilityActivity extends Activity {
                         add(tests,"DEVICE_LIST","0".equals(String.valueOf(code))||code==0?"PASS":"API_REJECTED",
                                 "HTTP "+response.optInt("_httpStatus",-1)+"; API code "+code+
                                 "; deviceCount "+count+"; firstDeviceFields "+firstKeys+
+                                "; deviceStatusSummary="+summarizeDeviceStatuses(list)+
                                 "; latencyMs "+elapsed,elapsed);
-                        if(empty(selectedId)&&first!=null)selectedId=firstId(first);
+                        if(empty(selectedId)&&first!=null){
+                            selectedId=firstId(first);
+                            final String autoSelectedId=selectedId;
+                            runOnUiThread(()->{if(deviceIdInput!=null&&empty(deviceIdInput.getText().toString()))deviceIdInput.setText(autoSelectedId);});
+                        }
                     }catch(Exception e){
                         add(tests,"DEVICE_LIST","ERROR",safeClass(e),System.currentTimeMillis()-start);
                     }
 
                     if(!empty(selectedId)&&selectedId.matches("[A-Za-z0-9_-]{1,100}")){
                         boolean infoQueryPassed=false;
-                        for(String parameter:new String[]{"devId","deviceId"}){
-                            if(infoQueryPassed)break;
-                            start=System.currentTimeMillis();
-                            try{
-                                JSONObject response=api.deviceInfoQuery(selectedId,parameter);
-                                long elapsed=System.currentTimeMillis()-start;
-                                int code=response.optInt("code",-1);
-                                JSONObject data=response.optJSONObject("data");
-                                String fields=data==null?"none":keys(data);
-                                String msg=safeMessage(response.optString("msg",""));
-                                String online="not_returned";
-                                if(data!=null){
-                                    for(String key:new String[]{"online","isOnline","status","deviceStatus","linkType"}){
-                                        if(data.has(key)){online=String.valueOf(data.opt(key));break;}
-                                    }
-                                }
-                                infoQueryPassed=(code==0);
-                                add(tests,"DEVICE_INFO_QUERY_"+parameter.toUpperCase(Locale.ROOT),
-                                        infoQueryPassed?"PASS":"API_REJECTED",
-                                        "GET /openapi/app/user/device/infoQuery; parameter="+parameter+
-                                        "; HTTP "+response.optInt("_httpStatus",-1)+"; API code "+code+
-                                        "; msg="+msg+"; onlineField="+online+"; dataKeys="+fields+
-                                        "; deviceId="+maskId(selectedId)+"; latencyMs="+elapsed,elapsed);
-                            }catch(Exception e){
-                                add(tests,"DEVICE_INFO_QUERY_"+parameter.toUpperCase(Locale.ROOT),
-                                        "ERROR",safeClass(e),System.currentTimeMillis()-start);
+                        long infoStart=System.currentTimeMillis();
+                        try{
+                            JSONObject response=api.deviceInfo(selectedId);
+                            long elapsed=System.currentTimeMillis()-infoStart;
+                            int code=response.optInt("code",-1);
+                            JSONObject data=response.optJSONObject("data");
+                            String fields=data==null?"none":keys(data);
+                            String statusField=extractStatusField(data);
+                            infoQueryPassed=(code==0);
+                            add(tests,"DEVICE_INFO_GET",infoQueryPassed?"PASS":"API_REJECTED",
+                                    "GET /openapi/app/user/device/getDeviceInfo; HTTP "+response.optInt("_httpStatus",-1)+
+                                    "; API code "+code+"; statusField="+statusField+
+                                    "; dataKeys="+fields+"; deviceId="+maskId(selectedId)+
+                                    "; latencyMs="+elapsed,elapsed);
+                            if(infoQueryPassed){
+                                add(tests,"DEVICE_STATUS_DETAIL",
+                                        "not_returned".equals(statusField)?"NOT_RETURNED":"FIELD_PRESENT_UNVERIFIED",
+                                        "Status field dari getDeviceInfo: "+statusField+
+                                        ". Nilai enum numerik tidak diterjemahkan menjadi online/offline tanpa dokumentasi vendor.",elapsed);
                             }
+                        }catch(Exception e){
+                            add(tests,"DEVICE_INFO_GET","ERROR",safeClass(e),System.currentTimeMillis()-infoStart);
+                        }
+
+                        if(!infoQueryPassed){
+                            for(String parameter:new String[]{"devId","deviceId"}){
+                                if(infoQueryPassed)break;
+                                start=System.currentTimeMillis();
+                                try{
+                                    JSONObject response=api.deviceInfoQuery(selectedId,parameter);
+                                    long elapsed=System.currentTimeMillis()-start;
+                                    int code=response.optInt("code",-1);
+                                    JSONObject data=response.optJSONObject("data");
+                                    String fields=data==null?"none":keys(data);
+                                    String msg=safeMessage(response.optString("msg",""));
+                                    String statusField=extractStatusField(data);
+                                    infoQueryPassed=(code==0);
+                                    add(tests,"DEVICE_INFO_QUERY_"+parameter.toUpperCase(Locale.ROOT),
+                                            infoQueryPassed?"PASS":"API_REJECTED",
+                                            "GET /openapi/app/user/device/infoQuery; parameter="+parameter+
+                                            "; HTTP "+response.optInt("_httpStatus",-1)+"; API code "+code+
+                                            "; msg="+msg+"; statusField="+statusField+"; dataKeys="+fields+
+                                            "; deviceId="+maskId(selectedId)+"; latencyMs="+elapsed,elapsed);
+                                    if(infoQueryPassed){
+                                        add(tests,"DEVICE_STATUS_DETAIL",
+                                                "not_returned".equals(statusField)?"NOT_RETURNED":"FIELD_PRESENT_UNVERIFIED",
+                                                "Status field dari infoQuery: "+statusField+
+                                                ". Nilai enum numerik tidak diterjemahkan tanpa dokumentasi vendor.",elapsed);
+                                    }
+                                }catch(Exception e){
+                                    add(tests,"DEVICE_INFO_QUERY_"+parameter.toUpperCase(Locale.ROOT),
+                                            "ERROR",safeClass(e),System.currentTimeMillis()-start);
+                                }
+                            }
+                        }else{
+                            add(tests,"DEVICE_INFO_QUERY_FALLBACK","SKIPPED",
+                                    "Fallback infoQuery tidak diperlukan karena getDeviceInfo berhasil.",0);
                         }
                     }else{
-                        add(tests,"DEVICE_INFO_QUERY","SKIPPED","Device ID tidak diberikan dan tidak dapat diambil dari respons list.",0);
+                        add(tests,"DEVICE_INFO_GET","SKIPPED","Device ID tidak diberikan dan tidak dapat diambil dari respons list.",0);
+                        add(tests,"DEVICE_INFO_QUERY","SKIPPED","Tidak ada Device ID untuk menguji fallback infoQuery.",0);
                     }
+
                     api.close();
                 }else{
                     add(tests,"SESSION","BLOCKED","Login terlebih dahulu melalui layar utama; AppID/AppToken harus diisi oleh pemilik aplikasi.",0);
@@ -180,12 +234,15 @@ public final class ApiCapabilityActivity extends Activity {
                 }
 
                 probe(tests,"OPENAPI_BASE","openapi-iot.cloudlinks.cn","/openapi/app");
+                probe(tests,"NETWORK_CONFIG_HOST","openapi-iot.cloudlinks.cn","/openapi/netcfg/app/getConnectInfo");
                 probe(tests,"AI_EVENT_HOST","saas-playback.cloudlinks.cn","/openapi/vpaasPlayback/vas/aievent/list");
                 probe(tests,"CLOUD_PLAYBACK_HOST","saas-playback.cloudlinks.cn","/openapi/vpaasPlayback/vas/playback/play");
 
-                add(tests,"AI_EVENT_AUTH","NOT_TESTED",
+                add(tests,"LIVE_P2P_SDK_TEST",P2PSession.ready()&&!empty(selectedId)?"MANUAL_TEST_REQUIRED":"BLOCKED",
+                        "Live P2P tidak diuji otomatis oleh API scanner. Gunakan tombol Buka Uji Live P2P Native; bukti stream adalah callback STATE_PLAY disertai dimensi video > 0 dan laju data. REGISTER_CALL_RETURNED saja bukan bukti autentikasi.",0);
+                add(tests,"AI_EVENT_AUTH","NOT_TESTED_VENDOR_SIGNER_REQUIRED",
                         "Tidak mengirim request API. Endpoint v2 pada referensi publik memerlukan signature runtime sha1WithBase256; metode signing resmi/otorisasi VAS belum tersedia di konfigurasi PBS saat ini.",0);
-                add(tests,"CLOUD_PLAYBACK_AUTH","NOT_TESTED",
+                add(tests,"CLOUD_PLAYBACK_AUTH","NOT_TESTED_VENDOR_SIGNER_REQUIRED",
                         "Tidak meminta URL HLS dan tidak mengunduh rekaman. Memerlukan autentikasi VAS dan hak akses playback yang dikonfirmasi Gwell.",0);
 
                 report.put("selectedDeviceId",maskId(selectedId));
@@ -195,8 +252,8 @@ public final class ApiCapabilityActivity extends Activity {
                     String st=tests.getJSONObject(i).optString("status");
                     if("PASS".equals(st))pass++;
                     else if("ERROR".equals(st)||"API_REJECTED".equals(st))failed++;
-                    else if("BLOCKED".equals(st))blocked++;
-                    else if("NOT_TESTED".equals(st)||"SKIPPED".equals(st))notTested++;
+                    else if("BLOCKED".equals(st)||"MANUAL_TEST_REQUIRED".equals(st))blocked++;
+                    else if(st.startsWith("NOT_TESTED")||"SKIPPED".equals(st)||"NOT_RETURNED".equals(st)||"FIELD_PRESENT_UNVERIFIED".equals(st))notTested++;
                 }
                 JSONObject summary=new JSONObject();
                 summary.put("passed",pass);summary.put("failedOrRejected",failed);
@@ -227,6 +284,45 @@ public final class ApiCapabilityActivity extends Activity {
         }
         return response.optJSONArray("data");
     }
+    private String extractStatusField(JSONObject data){
+        if(data==null)return "not_returned";
+        for(String key:new String[]{"online","isOnline","onlineStatus","deviceStatus","status","statusCode","linkStatus"}){
+            if(data.has(key)&&!data.isNull(key)){
+                Object value=data.opt(key);
+                return key+"="+safeMessage(String.valueOf(value));
+            }
+        }
+        return "not_returned";
+    }
+    private String summarizeDeviceStatuses(JSONArray list){
+        if(list==null)return "deviceList_not_returned";
+        int withField=0,explicitOnline=0,explicitOffline=0,unverified=0,missing=0;
+        StringBuilder fields=new StringBuilder();
+        for(int i=0;i<list.length();i++){
+            JSONObject row=list.optJSONObject(i);
+            if(row==null){missing++;continue;}
+            String found="";Object value=null;
+            for(String key:new String[]{"online","isOnline","onlineStatus","deviceStatus","status","statusCode","linkStatus"}){
+                if(row.has(key)&&!row.isNull(key)){found=key;value=row.opt(key);break;}
+            }
+            if(found.isEmpty()){missing++;continue;}
+            withField++;
+            if(fields.indexOf(found)<0){if(fields.length()>0)fields.append(",");fields.append(found);}
+            if(value instanceof Boolean){
+                if(((Boolean)value).booleanValue())explicitOnline++;else explicitOffline++;
+            }else{
+                String v=String.valueOf(value).trim().toLowerCase(Locale.ROOT);
+                if("online".equals(v)||"true".equals(v))explicitOnline++;
+                else if("offline".equals(v)||"false".equals(v))explicitOffline++;
+                else unverified++;
+            }
+        }
+        return "fields="+(fields.length()==0?"none":fields.toString())+
+                "; rowsWithStatus="+withField+"/"+list.length()+
+                "; explicitOnline="+explicitOnline+"; explicitOffline="+explicitOffline+
+                "; unverifiedVendorValues="+unverified+"; missing="+missing+
+                "; numeric/vendor enums are not interpreted";
+    }
     private String keys(JSONObject object){
         JSONArray names=object.names();
         return names==null?"none":names.toString();
@@ -250,11 +346,12 @@ public final class ApiCapabilityActivity extends Activity {
             c=(HttpsURLConnection)url.openConnection();
             c.setRequestMethod("HEAD");c.setConnectTimeout(8000);c.setReadTimeout(8000);
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent","PBS-Yoosee-Capability-Test/1.2.5");
+            c.setRequestProperty("User-Agent","PBS-Yoosee-Capability-Test/1.2.6");
             c.setRequestProperty("Accept","application/json");
             int http=c.getResponseCode();
             long elapsed=System.currentTimeMillis()-start;
-            add(tests,name,"HTTP_REACHABLE",
+            String probeStatus=http>=200&&http<300?"HTTP_REACHABLE":(http==401||http==403?"ACCESS_RESTRICTED":(http==404?"PATH_NOT_FOUND":(http>=500?"SERVER_ERROR":"HTTP_RESPONSE_OTHER")));
+            add(tests,name,probeStatus,
                     "TLS/HTTP response received; HTTP "+http+
                     "; endpoint path "+path+
                     "; this HEAD result does not prove authenticated API entitlement.",elapsed);
