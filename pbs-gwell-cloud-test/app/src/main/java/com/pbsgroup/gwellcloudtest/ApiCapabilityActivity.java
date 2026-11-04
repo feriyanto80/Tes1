@@ -201,7 +201,7 @@ public final class ApiCapabilityActivity extends Activity {
                     report.put("tests",tests);
                 }catch(Exception ignored){}
             }
-            reportText=report.toString(2);
+            reportText=report.toString();
             final String display=makeSummary(report);
             runOnUiThread(()->{
                 statusView.setText(display+"\n\nJSON REPORT\n"+reportText);
