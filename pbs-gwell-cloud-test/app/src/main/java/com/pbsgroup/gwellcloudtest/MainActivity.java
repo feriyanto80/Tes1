@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
             return insets;
         });
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
-        root.addView(label("PBS Gwell API Test v1.2.6",27,text,true));
+        root.addView(label("PBS Yoosee Dual Backend v1.2.8",27,text,true));
         root.addView(label("Login akun, daftar kamera, API Capability Test, Native P2P diagnostics, dan RTSP/ONVIF alternative.",13,secondary,false));
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
@@ -265,7 +265,7 @@ public final class MainActivity extends Activity {
     private void share(){
         Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");
         i.putExtra(Intent.EXTRA_SUBJECT,"PBS Gwell Cloud Diagnostic");
-        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.2.6\n"+lastReport+
+        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.2.8\n"+lastReport+
             "\nTidak memuat password, AppToken, P2P Device ID, atau sesi akses.");
         startActivity(Intent.createChooser(i,"Bagikan laporan diagnostik"));
     }
