@@ -7,6 +7,10 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Button;
@@ -41,6 +45,11 @@ public final class NativeP2PActivity extends Activity {
     private boolean registerCallReturned=false;
     private boolean playSeen=false;
     private Runnable watchdog;
+    private long sessionStartElapsed=0L;
+    private long registerReturnedElapsed=0L;
+    private long preparedElapsed=0L;
+    private long playElapsed=0L;
+    private String networkAtStart="UNKNOWN";
 
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
     private TextView label(String txt,int sp,int color,boolean bold){
@@ -75,6 +84,26 @@ public final class NativeP2PActivity extends Activity {
         if(s==PlayerStateEnum.STATE_IDLE)return "IDLE";
         return "UNKNOWN("+s+")";
     }
+    private String maskedDeviceId(){
+        if(deviceId==null||deviceId.length()<6)return "[REDACTED]";
+        return deviceId.substring(0,3)+"…"+deviceId.substring(deviceId.length()-2);
+    }
+    private String networkSnapshot(){
+        try{
+            ConnectivityManager cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+            Network n=cm.getActiveNetwork();
+            if(n==null)return "NO_ACTIVE_NETWORK";
+            NetworkCapabilities c=cm.getNetworkCapabilities(n);
+            if(c==null)return "CAPABILITIES_UNAVAILABLE";
+            String transport=c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)?"WIFI":
+                    c.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)?"CELLULAR":
+                    c.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)?"ETHERNET":
+                    c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)?"VPN":"OTHER";
+            return transport+"; internet="+c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)+
+                    "; validated="+c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+        }catch(Throwable t){return "NETWORK_DIAGNOSTIC_ERROR:"+t.getClass().getSimpleName();}
+    }
+    private String elapsed(long t){return t<=0?"NOT_REACHED":(t-sessionStartElapsed)+"ms";}
     private String playerMetrics(){
         if(player==null)return "player=null";
         try{
@@ -130,23 +159,25 @@ public final class NativeP2PActivity extends Activity {
             stopPlayerQuietly();
             synchronized(eventLog){eventLog.setLength(0);}
             errorCode=-1;prepared=false;registerCallReturned=false;playSeen=false;
-            event("START: SDK initialized at Application startup; "+PbsGwellApplication.getInitStatus());
+            sessionStartElapsed=SystemClock.elapsedRealtime();registerReturnedElapsed=0L;preparedElapsed=0L;playElapsed=0L;
+            networkAtStart=networkSnapshot();
+            event("START: SDK initialized at Application startup; "+PbsGwellApplication.getInitStatus()+"; network="+networkAtStart);
             long accessId=Long.parseLong(P2PSession.id());
             IoTVideoSdk.register(accessId,P2PSession.token());
-            registerCallReturned=true;
-            event("REGISTER_CALL_RETURNED: register() is void; this does NOT prove server authentication.");
+            registerCallReturned=true;registerReturnedElapsed=SystemClock.elapsedRealtime();
+            event("REGISTER_CALL_RETURNED: register() is void; this does NOT prove server authentication; elapsed="+elapsed(registerReturnedElapsed));
 
             player=new LivePlayer();
             player.setDataResource(deviceId,CallTypeEnum.VIDEO_DEFINITION_HD,(short)0);
             player.setPreparedListener(new IPreparedListener(){
                 @Override public void onPrepared(){
-                    prepared=true;event("PREPARED: SDK reports player prepared; waiting for stream/frame.");
+                    prepared=true;preparedElapsed=SystemClock.elapsedRealtime();event("PREPARED: SDK reports player prepared; waiting for stream/frame; elapsed="+elapsed(preparedElapsed));
                 }
             });
             player.setStatusListener(new IStatusListener(){
                 @Override public void onStatus(int state){
                     String name=stateName(state);
-                    if(state==PlayerStateEnum.STATE_PLAY)playSeen=true;
+                    if(state==PlayerStateEnum.STATE_PLAY){playSeen=true;playElapsed=SystemClock.elapsedRealtime();}
                     event("STATUS: "+name+" ("+state+")");
                 }
             });
@@ -156,12 +187,13 @@ public final class NativeP2PActivity extends Activity {
                 }
             });
             player.setVideoView(videoView);
-            event("PLAY_REQUEST: Device ID="+deviceId+"; definition=HD; sourceId=0");
+            event("PLAY_REQUEST: Device ID="+maskedDeviceId()+"; definition=HD; sourceId=0; network="+networkSnapshot());
             player.play();
             watchdog=()->{
                 if(player!=null&&!playSeen){
-                    event("WATCHDOG_25S: no STATE_PLAY; prepared="+prepared+
-                            "; registerCallReturned="+registerCallReturned+"; "+playerMetrics());
+                    event("WATCHDOG_25S: no STATE_PLAY; auth=NOT_CONFIRMED_BY_VOID_REGISTER; prepared="+prepared+
+                            "; registerCallReturned="+registerCallReturned+"; registerElapsed="+elapsed(registerReturnedElapsed)+
+                            "; preparedElapsed="+elapsed(preparedElapsed)+"; network="+networkSnapshot()+"; "+playerMetrics());
                 }
             };
             handler.postDelayed(watchdog,25000);
@@ -191,13 +223,17 @@ public final class NativeP2PActivity extends Activity {
     private void copyReport(){
         String events;
         synchronized(eventLog){events=eventLog.toString();}
-        String report="PBS Native P2P diagnostic · build 1.2.6"+
-                "\nDevice ID: "+deviceId+
+        String report="PBS Native P2P diagnostic · build 1.2.7"+
+                "\nDevice ID: "+maskedDeviceId()+
                 "\nSDK init: "+PbsGwellApplication.getInitStatus()+
                 "\nprepared: "+prepared+
                 "\nregisterCallReturned: "+registerCallReturned+
                 "\nplaySeen: "+playSeen+
                 "\nerrorCode: "+errorCode+
+                "\nnetworkAtStart: "+networkAtStart+
+                "\nregisterElapsed: "+elapsed(registerReturnedElapsed)+
+                "\npreparedElapsed: "+elapsed(preparedElapsed)+
+                "\nplayElapsed: "+elapsed(playElapsed)+
                 "\nmetrics: "+playerMetrics()+
                 "\nEVENTS:\n"+events+
                 "\nCredentials and raw SDK logs intentionally excluded.";
