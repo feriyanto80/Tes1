@@ -64,7 +64,7 @@ final class DualBackendDiagnostic {
             confidence="MEDIUM_HEURISTIC_NOT_PROOF";
             evidence="numericIdLength<=8; deviceCate=1 (first-generation label in public demo)";
         } else if(legacyNumber){
-            recommendation="GWELL_LEGACY_CANDIDATE";
+            recommendation="UNCONFIRMED_BACKEND_LEGACY_ID_HINT";
             confidence="LOW_HEURISTIC_ONLY";
             evidence="numericIdLength<=8; backend metadata not explicit";
         } else if("2".equals(category)){
