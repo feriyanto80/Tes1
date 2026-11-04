@@ -1,53 +1,108 @@
-# PBS Yoosee / Gwell API Capability Scanner v1.2.7
+# PBS Yoosee P2P v1.2.8 — Dual Backend Diagnostic
 
-Android diagnostic build based cumulatively on v1.2.6. Package: `com.pbsgroup.gwellcloudtest.p2pnative127diag`; versionCode: `12702`; versionName: `1.2.7`. Installs side-by-side with v1.2.6 and earlier diagnostic packages.
+**Release type:** cumulative Android diagnostics package, derived from v1.2.7.
+**Android package:** `com.pbsgroup.gwellcloudtest.p2pnative128diag`
+**versionCode:** `12800` — **versionName:** `1.2.8`.
 
-## v1.2.7 changes (updated relationship diagnostic)
+## Purpose
 
-- Preserves the v1.2.6 API inventory, DNS diagnostics, authenticated device-list/info tests, and native IoTVideo P2P screen.
-- Adds an authenticated, **read-only account-to-camera preflight** using the existing IoTVideo Cloudlinks session: device list plus read-only metadata fallback. List results may be paginated; absence on one page is not definitive evidence of missing access.
-- Adds an error 8003 diagnostic hint: GWTimes' published IoTVideo Asrv table identifies 8003 as invalid user-device relationship. Android server-origin equivalence and actual entitlement remain unverified; there is no bypass or implicit binding.
-- Adds manual HD and SD P2P tests, independent of automatic changes to owner-sharing permissions. Preflight failures are reported as UNKNOWN/REJECTED and do not masquerade as conclusive offline state.
-- Adds MEDIA_VERIFIED only when STATE_PLAY, nonzero dimensions, and measured AV bitrate occur together.
-- Adds native P2P session timing markers for SDK register call return, player prepared callback, and first STATE_PLAY callback.
-- Captures Android active-network transport and validated-internet state at session start and play request.
-- Adds a 25-second watchdog diagnostic when STATE_PLAY is not reached, including session timing and current network state.
-- Redacts the Device ID in the copied native P2P diagnostic report.
-- Explicitly classifies SDK register-call return as NOT authentication proof. No undocumented authentication method or vendor API is fabricated.
+This release investigates why a camera that streams in the vendor Yoosee app can
+still return error 8003 when PBS attempts to play with an archived
+`com.tencentcs.iotvideo` SDK.
 
-## Important interpretation
+**Important: Dual Backend Diagnostic is NOT dual-backend live streaming.**
+The existing IoTVideo SDK is included for actual HD/SD live tests. The vendor's
+separate legacy GWell `com.p2p.core` runtime, compatible native binaries and
+the proprietary GWell session/verification API are not included. Consequently,
+the legacy side performs **read-only assessment only** and explicitly reports
+`NOT_PACKAGED_NO_LEGACY_P2P_LIVE` instead of simulating successful playback.
+This prevents a misleading 'fix' that bypasses vendor authentication.
 
-The IoTVideo SDK's `IoTVideoSdk.register()` method used by this baseline returns void. Therefore v1.2.7 can measure the call returning and subsequent player callbacks, but cannot independently assert server-side authentication unless the SDK exposes a documented authentication callback or Gwell supplies a supported verification method. A successful live stream is evidenced by STATE_PLAY, non-zero video dimensions, and received AV data.
+## v1.2.8 additions
 
-## Evidence for error 8003
+- **Diagnostik Dual Backend (IoTVideo / GWell)** button on the Native P2P screen.
+- Metadata extraction from the authenticated device list, with a
+  `device/getDeviceInfo` read-only fallback. Sanitized `relationCode`,
+  `deviceCate`, and recognized protocol hints are reported, but no raw API
+  response is copied.
+- Explicit separation of **account listing**, **server authorization**,
+  **backend selection**, **P2P session state**, and **media verification**.
+- Legacy GWell capability assessment: older numeric-ID *heuristic*,
+  first-generation `deviceCate` *heuristic*, optional explicit protocol hint,
+  availability of legacy `com.p2p.core.P2PHandler`, presence of the official
+  Yoosee app, and DNS-only diagnostics for known candidate infrastructure.
+- Confidence levels distinguish explicit backend hints from heuristics:
+  numeric Device IDs of eight digits or fewer **do not prove GWell Legacy**.
+- SDK legacy credentials `UserID`, `SessionID1`, `SessionID2`, verification
+  codes are deliberately not fabricated from IoTVideo AccessID/AccessToken.
+- The v1.2.7 read-only relationship preflight, HD/SD IoTVideo player callbacks,
+  timing, and media verification are retained.
+- Existing API inventory, Cloud API login, device list and info tests,
+  RTSP/ONVIF alternative, and credential redaction are retained.
 
-Official GWTimes IoTVideo iOS error header: [IVError.h](https://github.com/GWTimes/IoTVideoSDK-iOS/blob/master/Frameworks/IoTVideo.framework/Headers/IVError.h). It enumerates `IVASrvErr_dst_error_relation = 8003` (invalid relationship). This is **server-level reference evidence**, not proof that PBS's archived Android SDK returned the same category; use read-only preflight and SDK callbacks to confirm.
+## Interpreting `8003`
 
-The prior v1.2.7 APK in this branch used an independently generated debug signing key. This updated diagnostic build has a separate applicationId so it can install side-by-side without Android signature conflict. It does not overwrite an earlier v1.2.7 APK.
+GWTimes IoTVideo defines ASrv code `8003` as
+`IVASrvErr_dst_error_relation` ("invalid relationship chain") in its publicly
+available [error header](https://github.com/GWTimes/IoTVideoSDK-iOS/blob/master/Frameworks/IoTVideo.framework/Headers/IVError.h).
+That is evidence for a **possible** account/device/namespace rejection; the
+specific Android SDK callback's origin and backend equivalence have not been
+verified for the PBS camera.
 
-## Safety boundaries
+A camera being `LISTED` in authenticated Cloudlinks API responses does **not**
+prove that the IoTVideo P2P server recognizes playback rights.
 
-- Endpoint Inventory Scan sends only OPTIONS and read-only HEAD requests.
-- Authenticated Device List and Device Info tests use the session created by the user after logging into their own account.
-- Reports do not include passwords, AppToken, AccessToken, signatures, playback URLs, private keys, raw SDK logs, or complete Device IDs.
-- No account mutation, binding/unbinding, sharing, firmware update, password change/reset, SMS/email, billing, delete, token generation or secret retrieval is performed.
-- Cloud Playback and AI Event remain `NOT_TESTED_VENDOR_SIGNER_REQUIRED` until Gwell confirms PBS VAS entitlement and provides a supported third-party signing method.
+The legacy GWell developer example
+[dxsdyhm/GwellDemo](https://github.com/dxsdyhm/GwellDemo)
+uses a different account/session flow and an old `p2p-core` artifact (0.4.4,
+2018). That dependency's compatible, licensed native runtime has not been
+verified for modern Android. It is **not** copied into this package.
 
-## Run
+## Usage
 
-1. Install `PBS_Gwell_API_Capability_Scanner_v1.2.7.apk`.
-2. Enter the AppID/AppToken issued for PBS and log in using an account you own.
-3. Use **API Capability Test** to test Device List and Device Info.
-4. Open **Buka Uji Live P2P Native**; test **Cek relasi akun–kamera** first, then run HD or SD P2P diagnostic. The play buttons repeat the read-only preflight automatically.
-5. If SDK_ERROR 8003 appears, inspect AUTH_PREFLIGHT_RESULT. If account/device relationship is not authorized, use the official Yoosee owner-share/binding workflow or request vendor confirmation. Never force-bind a camera.
-6. Copy the redacted diagnostic report and share it for analysis.
+1. Install the **v1.2.8 APK** from `releases/`. New package identity permits
+   side-by-side diagnostic installation without Android debug-signature conflict.
+2. Log in using **your own valid** GWell/Yoosee AppID, AppToken, and account.
+3. Select the camera from the authenticated device list.
+4. Open **Native Live P2P** and tap **Diagnostik Dual Backend**.
+5. Read `BACKEND_ASSESSMENT`, `confidence`, `legacyRuntime`,
+   `legacyCredentials`, `legacyDns` — the legacy button does not attempt live.
+6. Tap **Diagnostik Live P2P HD** or **SD** to test the bundled IoTVideo SDK
+   independently. Verify `STATE_PLAY`, non-zero dimensions and AV throughput.
+7. Tap **Salin Hasil Uji** to copy the redacted diagnostic. The report masks
+   the Device ID and never exports credentials.
 
-Do not share passwords, AppToken, AccessToken, signatures, or complete Device IDs.
+Do not reset the camera, change its owner, share it, or automatically bind/unbind
+devices as a troubleshooting shortcut. Consult the vendor if a legitimate
+relationship is rejected.
 
-## Build
+## Building
 
-GitHub Actions workflow: `.github/workflows/pbs-gwell-api-capability-v1.2.7.yml`. It downloads the upstream GWTimes IoTVideo AAR, builds the debug APK, packages the complete project source (third-party AAR excluded), uploads workflow artifacts, and publishes APK, source ZIP and their SHA-256 checksums to this branch.
+`./gradlew` is not shipped; GitHub Actions uses Gradle 8.10.2 directly.
 
-## Licensing
+```bash
+gradle -p pbs-gwell-cloud-test :app:assembleDebug --no-daemon --stacktrace
+```
 
-The upstream IoTVideo AAR is a third-party SDK. This experimental compatibility build is for controlled testing. Obtain written redistribution/commercial-use permission and the current supported SDK package from the rights holder before production deployment.
+Before running Gradle locally, supply the **properly licensed** GWTimes
+IoTVideo AAR as `pbs-gwell-cloud-test/app/libs/iotvideo-release.aar`.
+GitHub Actions temporarily retrieves the publicly available *archived demo*
+AAR referenced by the original v1.2.6 project; the AAR is not redistributed
+in this source ZIP. For commercial or production use, obtain a supported vendor
+SDK and authorization.
+
+Build workflow:
+`.github/workflows/pbs-gwell-dual-backend-v1.2.8.yml`.
+
+It publishes the diagnostic APK, the cumulative source ZIP (without
+vendor binaries and historical APK files), and SHA-256 checksums to this
+release branch.
+
+## Limitations
+
+- No tested GWell Legacy live-session implementation without the vendor SDK.
+- DNS resolution is infrastructure evidence, not an authenticated P2P handshake.
+- Vendor relation enums and backend hints must be confirmed with product API docs.
+- A "camera listed" state is not an authorization grant.
+- No hardware end-to-end verification is possible from GitHub Actions.
+- Use for controlled technical diagnostics only.
