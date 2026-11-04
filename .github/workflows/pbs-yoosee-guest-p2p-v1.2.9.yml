@@ -1,0 +1,90 @@
+name: Build PBS Yoosee Guest P2P Compatibility v1.2.9
+on:
+  push:
+    branches: [pbs-gwell-api-capability-v1.2.9]
+    paths:
+      - 'pbs-gwell-cloud-test/app/src/**'
+      - 'pbs-gwell-cloud-test/app/build.gradle'
+      - 'pbs-gwell-cloud-test/build.gradle'
+      - 'pbs-gwell-cloud-test/settings.gradle'
+      - 'pbs-gwell-cloud-test/gradle.properties'
+      - 'pbs-gwell-cloud-test/README.md'
+      - '.github/workflows/pbs-yoosee-guest-p2p-v1.2.9.yml'
+  workflow_dispatch:
+concurrency:
+  group: pbs-yoosee-guest-p2p-v1.2.9-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK
+        run: |
+          SDKMGR=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          "$SDKMGR" "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Fetch archived GWTimes IoTVideo demo AAR
+        run: |
+          mkdir -p pbs-gwell-cloud-test/app/libs
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://raw.githubusercontent.com/GWTimes/IoTVideo-Android/master/app/libs/iotvideo-release.aar" \
+            -o pbs-gwell-cloud-test/app/libs/iotvideo-release.aar
+          test "$(stat -c%s pbs-gwell-cloud-test/app/libs/iotvideo-release.aar)" -gt 9000000
+          unzip -t pbs-gwell-cloud-test/app/libs/iotvideo-release.aar | tail -n 2
+      - name: Build Android APK
+        run: gradle -p pbs-gwell-cloud-test :app:assembleDebug --no-daemon --stacktrace
+      - name: Validate APK package and archive
+        run: |
+          test -s pbs-gwell-cloud-test/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t pbs-gwell-cloud-test/app/build/outputs/apk/debug/app-debug.apk | tail -n 2
+      - name: Package cumulative source
+        run: |
+          zip -q -r PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_SOURCE.zip \
+            pbs-gwell-cloud-test .github/workflows/pbs-yoosee-guest-p2p-v1.2.9.yml \
+            -x 'pbs-gwell-cloud-test/app/build/*' \
+               'pbs-gwell-cloud-test/releases/*' \
+               'pbs-gwell-cloud-test/app/libs/*' \
+               'pbs-gwell-cloud-test/.gradle/*'
+          unzip -t PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_SOURCE.zip | tail -n 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_APK
+          path: pbs-gwell-cloud-test/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_SOURCE
+          path: PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_SOURCE.zip
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish direct GitHub APK, source and checksums
+        run: |
+          mkdir -p pbs-gwell-cloud-test/releases
+          cp pbs-gwell-cloud-test/app/build/outputs/apk/debug/app-debug.apk \
+            pbs-gwell-cloud-test/releases/PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9.apk
+          cp PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_SOURCE.zip pbs-gwell-cloud-test/releases/
+          cd pbs-gwell-cloud-test/releases
+          sha256sum PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9.apk \
+            > PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9.apk.sha256
+          sha256sum PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_SOURCE.zip \
+            > PBS_Yoosee_Guest_P2P_Compatibility_v1.2.9_SOURCE.zip.sha256
+          cd ../../
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pbs-gwell-cloud-test/releases/
+          if git diff --staged --quiet; then
+            echo "Release binaries unchanged"
+          else
+            git commit -m "Publish PBS Yoosee Guest P2P v1.2.9 APK/source [skip ci]"
+            git push origin HEAD:pbs-gwell-api-capability-v1.2.9
+          fi
