@@ -382,7 +382,7 @@ public final class GwellNativeActivity extends BaseMonitorActivity {
             ClipData.newPlainText("PBS GWell Native Diagnostic",report));
         event("GWELL_REPORT_COPIED: redacted report copied");
     }
-    @Override protected void onDestroy(){
+    @Override public void onDestroy(){
         closed=true;generation++;
         try{if(channelId>=0)P2PHandler.getInstance().finish(channelId);}catch(Throwable ignored){}
         try{if(p2pConnected)P2PHandler.getInstance().p2pDisconnect();}catch(Throwable ignored){}
