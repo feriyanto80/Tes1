@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
             return insets;
         });
         root.addView(label("PBS GROUP · EXPERIMENTAL",12,accent,true));
-        root.addView(label("PBS Yoosee Dual Backend v1.2.8",27,text,true));
+        root.addView(label("PBS Yoosee Guest P2P v1.2.9",27,text,true));
         root.addView(label("Login akun, daftar kamera, Dual Backend Diagnostic (IoTVideo + GWell Legacy), dan RTSP/ONVIF alternatif.",13,secondary,false));
         section(root,"01 · IDENTITAS APLIKASI VENDOR");
         appId=input(root,"AppID yang sah dari Gwell/Yoosee","",false);
@@ -70,7 +70,7 @@ public final class MainActivity extends Activity {
         Button detail=button(root,"Lihat informasi Device ID",false);
         Button liveBtn=button(root,"▶ Buka LIVE VIDEO + PTZ",true);
         liveBtn.setOnClickListener(v->openCameraViewer(deviceId.getText().toString().trim()));
-        Button p2pBtn=button(root,"🔬 Dual Backend P2P Diagnostic",true);
+        Button p2pBtn=button(root,"🔐 Guest P2P Auth & Backend Diagnostic",true);
         p2pBtn.setOnClickListener(v->openNativeP2P(deviceId.getText().toString().trim()));
         Button cloudBtn=button(root,"☁ Cloud Recording / AI Event · cek akses",false);
         cloudBtn.setOnClickListener(v->startActivity(new Intent(this,CloudAccessActivity.class)));
@@ -265,7 +265,7 @@ public final class MainActivity extends Activity {
     private void share(){
         Intent i=new Intent(Intent.ACTION_SEND);i.setType("text/plain");
         i.putExtra(Intent.EXTRA_SUBJECT,"PBS Gwell Cloud Diagnostic");
-        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.2.8\n"+lastReport+
+        i.putExtra(Intent.EXTRA_TEXT,"PBS Gwell API Capability Test v1.2.9\n"+lastReport+
             "\nTidak memuat password, AppToken, P2P Device ID, atau sesi akses.");
         startActivity(Intent.createChooser(i,"Bagikan laporan diagnostik"));
     }
