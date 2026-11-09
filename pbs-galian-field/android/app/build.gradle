@@ -1,0 +1,18 @@
+plugins { id 'com.android.application' }
+def serverURL = (project.findProperty('pbsBaseUrl') ?: 'https://galian.pbsgroup.id/').toString()
+if (!serverURL.startsWith('https://')) throw new GradleException('pbsBaseUrl harus HTTPS')
+android {
+    namespace 'id.pbsgroup.galianfield'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'id.pbsgroup.galianfield'
+        minSdk 26
+        targetSdk 35
+        versionCode 100
+        versionName '1.0.0'
+        buildConfigField 'String', 'APP_URL', '"' + serverURL.replace('"','') + '"'
+    }
+    buildTypes { release { minifyEnabled false } }
+    buildFeatures { buildConfig true }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
