@@ -1,0 +1,1 @@
+PBS GALIAN v1.2 — native Android GPS pbsfield://gps, direct phone camera with FileProvider cache, multi-photo picker. Backend Node.js v1.2.0 must be installed separately and connected to Google Drive through OAuth. Debug APK may not update existing debug signing; retain files/data before uninstall.

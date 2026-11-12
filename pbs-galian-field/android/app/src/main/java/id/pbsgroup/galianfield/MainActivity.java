@@ -3,7 +3,17 @@ package id.pbsgroup.galianfield;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.ContentValues;
+import android.location.LocationManager;
+import android.location.LocationListener;
+import android.location.Location;
+import android.os.Handler;
+import android.os.Looper;
+import android.content.ClipData;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Locale;
+import org.json.JSONObject;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
@@ -22,6 +32,11 @@ import android.widget.Toast;
 public final class MainActivity extends Activity {
   private static final int REQUEST_FILE = 4102;
   private static final int REQUEST_LOCATION = 4103;
+  private static final int REQUEST_NATIVE = 4104;
+  private LocationManager gpsManager;
+  private LocationListener gpsListener;
+  private Handler gpsHandler = new Handler(Looper.getMainLooper());
+  private Runnable gpsTimeout;
   private WebView web;
   private ValueCallback<Uri[]> fileCallback;
   private Uri cameraUri;
@@ -45,11 +60,13 @@ public final class MainActivity extends Activity {
     settings.setAllowFileAccess(false);
     settings.setAllowContentAccess(true);
     settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+    settings.setUserAgentString(settings.getUserAgentString()+" PBSGalianAndroid/1.2");
 
     web.setWebViewClient(new WebViewClient() {
       @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
         Uri uri = request.getUrl();
         String destination = uri.toString();
+        if ("pbsfield".equals(uri.getScheme()) && "gps".equals(uri.getHost())) { requestNativeGPS(); return true; }
         if (destination.equals(serverOrigin) || destination.startsWith(serverOrigin + "/")) return false;
         if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {
           try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
@@ -63,26 +80,23 @@ public final class MainActivity extends Activity {
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         fileCallback = callback;
         try {
-          Intent choose = params.createIntent();
-          Intent chooser = Intent.createChooser(choose, "Pilih dokumen / kamera");
           boolean photo = false;
-          for (String type : params.getAcceptTypes()) {
-            if (type.contains("image") || type.equals("*/*")) photo = true;
+          for(String type : params.getAcceptTypes()) if(type != null && (type.contains("image") || type.equals("*/*"))) photo = true;
+          if(!photo){
+            startActivityForResult(Intent.createChooser(params.createIntent(), "Pilih dokumen"), REQUEST_FILE);
+            return true;
           }
-          if (photo) {
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Images.Media.DISPLAY_NAME, "PBS_GALIAN_" + System.currentTimeMillis() + ".jpg");
-            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-            cameraUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-            if (cameraUri != null) {
-              Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-              if (camera.resolveActivity(getPackageManager()) != null) {
-                camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
-                camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camera});
-              }
-            }
+          if(params.isCaptureEnabled()){
+            Intent camera = createCameraIntent();
+            if(camera!=null){ startActivityForResult(camera,REQUEST_FILE); return true; }
           }
+          Intent picker = new Intent(Intent.ACTION_GET_CONTENT);
+          picker.setType("image/*");
+          picker.addCategory(Intent.CATEGORY_OPENABLE);
+          picker.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,params.getMode()==FileChooserParams.MODE_OPEN_MULTIPLE);
+          Intent chooser = Intent.createChooser(picker,"Pilih foto / kamera");
+          Intent camera = createCameraIntent();
+          if(camera!=null) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS,new Intent[]{camera});
           startActivityForResult(chooser, REQUEST_FILE);
           return true;
         } catch (Exception ex) {
@@ -107,15 +121,77 @@ public final class MainActivity extends Activity {
     if (state != null) web.restoreState(state); else web.loadUrl(BuildConfig.APP_URL);
   }
 
+
+  private Intent createCameraIntent() {
+    Intent i=new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+    if(i.resolveActivity(getPackageManager())==null)return null;
+    try{
+      File folder=getExternalCacheDir()!=null?getExternalCacheDir():getCacheDir();
+      File photo=new File(folder,"PBS_GALIAN_"+System.currentTimeMillis()+".jpg");
+      cameraUri=FileProvider.getUriForFile(this,getPackageName()+".fileprovider",photo);
+      i.putExtra(MediaStore.EXTRA_OUTPUT,cameraUri);
+      i.setClipData(ClipData.newRawUri("PBS Camera",cameraUri));
+      i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+      return i;
+    }catch(Exception e){cameraUri=null;return null;}
+  }
+  private boolean hasLocation(){
+    return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED ||
+           checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED;
+  }
+  private void requestNativeGPS() {
+    if(!hasLocation()){requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},REQUEST_NATIVE);return;}
+    getNativeGPS();
+  }
+  private void sendGpsError(String message){
+    web.evaluateJavascript("window.PBSNativeGPSResult&&window.PBSNativeGPSResult({ok:false,error:"+JSONObject.quote(message)+"});",null);
+  }
+  private void stopNativeGPS(){
+    if(gpsTimeout!=null){gpsHandler.removeCallbacks(gpsTimeout);gpsTimeout=null;}
+    if(gpsManager!=null&&gpsListener!=null){try{gpsManager.removeUpdates(gpsListener);}catch(SecurityException ignored){}gpsListener=null;}
+  }
+  private void sendGps(Location loc){
+    stopNativeGPS();
+    if(loc==null){sendGpsError("GPS belum mendapatkan lokasi. Aktifkan lokasi presisi dan ulangi.");return;}
+    String json=String.format(Locale.US,"{ok:true,lat:%.8f,lng:%.8f,accuracy:%.2f}",loc.getLatitude(),loc.getLongitude(),loc.hasAccuracy()?loc.getAccuracy():9999.0f);
+    web.evaluateJavascript("window.PBSNativeGPSResult&&window.PBSNativeGPSResult("+json+");",null);
+  }
+  private void getNativeGPS(){
+    if(!hasLocation()){sendGpsError("Izin lokasi ditolak. Buka Settings > Apps > PBS Galian Field > Permissions > Location.");return;}
+    stopNativeGPS();
+    gpsManager=(LocationManager)getSystemService(LOCATION_SERVICE);
+    if(gpsManager==null){sendGpsError("Sensor lokasi Android tidak tersedia.");return;}
+    try{
+      String provider=gpsManager.isProviderEnabled(LocationManager.GPS_PROVIDER)?LocationManager.GPS_PROVIDER:
+                      (gpsManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)?LocationManager.NETWORK_PROVIDER:null);
+      if(provider==null){sendGpsError("GPS/lokasi HP belum aktif.");return;}
+      final Location last=gpsManager.getLastKnownLocation(provider);
+      gpsListener=new LocationListener(){
+        @Override public void onLocationChanged(Location l){sendGps(l);}
+        @Override public void onStatusChanged(String p,int s,Bundle e){}
+        @Override public void onProviderEnabled(String p){}
+        @Override public void onProviderDisabled(String p){sendGpsError("GPS dimatikan.");stopNativeGPS();}
+      };
+      gpsManager.requestLocationUpdates(provider,0L,0f,gpsListener,Looper.getMainLooper());
+      gpsTimeout=()->{stopNativeGPS();if(last!=null&&(System.currentTimeMillis()-last.getTime())<120000)sendGps(last);else sendGpsError("GPS timeout 25 detik. Coba di ruang terbuka.");};
+      gpsHandler.postDelayed(gpsTimeout,25000);
+    }catch(SecurityException e){sendGpsError("Izin GPS tidak diberikan.");}
+    catch(Exception e){sendGpsError("Layanan GPS tidak siap.");}
+  }
+
   @Override protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
     if (request == REQUEST_FILE && fileCallback != null) {
-      Uri[] chosen = WebChromeClient.FileChooserParams.parseResult(result, data);
-      if (result == RESULT_OK && (chosen == null || chosen.length == 0) && cameraUri != null) chosen = new Uri[]{cameraUri};
-      if (cameraUri != null && (chosen == null || chosen.length == 0 || !cameraUri.equals(chosen[0]))) {
-        try { getContentResolver().delete(cameraUri, null, null); } catch (Exception ignored) {}
+      ArrayList<Uri> picked=new ArrayList<>();
+      if(result==RESULT_OK){
+        if(data!=null && data.getClipData()!=null){
+          ClipData clips=data.getClipData();
+          for(int n=0;n<clips.getItemCount();n++)picked.add(clips.getItemAt(n).getUri());
+        }else if(data!=null&&data.getData()!=null) picked.add(data.getData());
+        else if(cameraUri!=null) picked.add(cameraUri);
       }
-      cameraUri = null;
+      Uri[] chosen=picked.isEmpty()?null:picked.toArray(new Uri[0]);
+      cameraUri=null;
       fileCallback.onReceiveValue(chosen);
       fileCallback = null;
     }
@@ -123,6 +199,7 @@ public final class MainActivity extends Activity {
 
   @Override public void onRequestPermissionsResult(int request, String[] perms, int[] grants) {
     super.onRequestPermissionsResult(request, perms, grants);
+    if (request == REQUEST_NATIVE) getNativeGPS();
     if (request == REQUEST_LOCATION && locationCallback != null) {
       boolean allowed = false;
       for (int grant : grants) if (grant == PackageManager.PERMISSION_GRANTED) allowed = true;
@@ -135,6 +212,7 @@ public final class MainActivity extends Activity {
   @Override public void onBackPressed() { if (web.canGoBack()) web.goBack(); else super.onBackPressed(); }
   @Override protected void onDestroy() {
     if (fileCallback != null) { fileCallback.onReceiveValue(null); fileCallback = null; }
+    stopNativeGPS();
     web.destroy();
     super.onDestroy();
   }
