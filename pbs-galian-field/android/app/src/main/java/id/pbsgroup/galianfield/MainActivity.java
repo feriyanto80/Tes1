@@ -25,6 +25,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.content.ClipData;
 import androidx.core.content.FileProvider;
+import androidx.core.view.WindowCompat;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -77,7 +78,7 @@ public final class MainActivity extends Activity {
     settings.setAllowFileAccess(false);
     settings.setAllowContentAccess(true);
     settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-    settings.setUserAgentString(settings.getUserAgentString()+" PBSGalianAndroid/1.3");
+    settings.setUserAgentString(settings.getUserAgentString()+" PBSGalianAndroid/1.4");
 
     web.setWebViewClient(new WebViewClient() {
       @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {

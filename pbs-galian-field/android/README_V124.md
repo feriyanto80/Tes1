@@ -1,0 +1,3 @@
+# PBS GALIAN FIELD Android 1.2.4
+
+Supports server-side UI update v1.2.4: mobile Sync layout, live GPS location and blink marker, OpenStreetMap/Esri basemap, TEST_ONLY remote map. Native Activity retains foreground location permission + camera/drive workflow and uses edge insets fit, wide viewport. Install Node.js v1.2.4 server update first. This is a debug APK; an existing debug signed APK may require uninstall, so first sync local pending uploads. Live map requires HTTPS and internet.
